@@ -1,0 +1,319 @@
+// Prisma Schema — University Computer Lab Occupancy System
+// Database: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  ADMIN
+  REPRESENTATIVE
+}
+
+enum AccountStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  DISABLED
+}
+
+enum TableType {
+  REGULAR
+  RESERVED
+}
+
+enum TableStatus {
+  AVAILABLE
+  PENDING_APPROVAL
+  APPROVED
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+}
+
+enum ConnectionType {
+  ETHERNET    // Verified university Ethernet (requires IT integration)
+  HOTSPOT     // Student using friend's hotspot or unverified connection
+  UNVERIFIED  // Cannot determine connection type (default until IT integration)
+}
+
+enum RequestStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum SessionStatus {
+  ACTIVE
+  ENDED
+  EXPIRED
+  ADMINISTRATIVELY_ENDED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+// ─────────────────────────────────────────
+// USER
+// ─────────────────────────────────────────
+
+model User {
+  id              String        @id @default(cuid())
+  email           String        @unique
+  name            String
+  passwordHash    String?
+  role            Role          @default(STUDENT)
+  accountStatus   AccountStatus @default(PENDING_VERIFICATION)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  sessions          OccupancySession[]
+  requests          OccupancyRequest[]
+  approvalActions   ApprovalRecord[]   @relation("AdminApprovals")
+  auditLogsAsActor  AuditLog[]         @relation("AuditActor")
+  notifications     Notification[]
+  authSessions      AuthSession[]
+  settingsUpdated   SystemSetting[]
+
+  @@index([email])
+  @@index([role])
+  @@index([accountStatus])
+}
+
+// ─────────────────────────────────────────
+// AUTH SESSION (server-side session store)
+// ─────────────────────────────────────────
+
+model AuthSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ─────────────────────────────────────────
+// EMAIL VERIFICATION TOKEN
+// ─────────────────────────────────────────
+
+model VerificationToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+
+  @@index([email])
+  @@index([token])
+}
+
+// ─────────────────────────────────────────
+// PASSWORD RESET TOKEN
+// ─────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+
+  @@index([email])
+  @@index([token])
+}
+
+// ─────────────────────────────────────────
+// LAB TABLE
+// ─────────────────────────────────────────
+
+model LabTable {
+  id          String      @id @default(cuid())
+  tableCode   String      @unique // T01–T25
+  tableType   TableType   @default(REGULAR)
+  name        String      // Display name, configurable by admin
+  description String?
+  status      TableStatus @default(AVAILABLE)
+  isActive    Boolean     @default(true)
+  hasEthernet Boolean     @default(true) // Physical ethernet port working?
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  requests OccupancyRequest[]
+  sessions OccupancySession[]
+
+  @@index([tableCode])
+  @@index([status])
+  @@index([tableType])
+}
+
+// ─────────────────────────────────────────
+// OCCUPANCY REQUEST
+// ─────────────────────────────────────────
+
+model OccupancyRequest {
+  id               String         @id @default(cuid())
+  userId           String
+  tableId          String
+  connectionType   ConnectionType @default(UNVERIFIED)
+  status           RequestStatus  @default(PENDING_APPROVAL)
+  submittedAt      DateTime       @default(now())
+  reviewedBy       String?        // Admin user ID
+  reviewedAt       DateTime?
+  rejectionReason  String?
+  expiresAt        DateTime?      // Auto-expire pending requests
+  clientIpAddress  String?        // For logging only, never for verification
+  userAgent        String?
+
+  // Relations
+  user     User              @relation(fields: [userId], references: [id])
+  table    LabTable          @relation(fields: [tableId], references: [id])
+  approval ApprovalRecord?
+  session  OccupancySession?
+
+  @@index([userId])
+  @@index([tableId])
+  @@index([status])
+  @@index([submittedAt])
+}
+
+// ─────────────────────────────────────────
+// APPROVAL RECORD
+// Specific to a request — cannot be reused
+// ─────────────────────────────────────────
+
+model ApprovalRecord {
+  id         String           @id @default(cuid())
+  requestId  String           @unique // One approval per request
+  adminId    String
+  decision   ApprovalDecision
+  reason     String?
+  createdAt  DateTime         @default(now())
+  expiresAt  DateTime         // Approval expires if not activated
+  usedAt     DateTime?        // Set when session is created — prevents reuse
+
+  // Relations
+  request OccupancyRequest @relation(fields: [requestId], references: [id])
+  admin   User             @relation("AdminApprovals", fields: [adminId], references: [id])
+
+  @@index([requestId])
+  @@index([adminId])
+  @@index([decision])
+}
+
+// ─────────────────────────────────────────
+// OCCUPANCY SESSION
+// Critical: DB-enforced uniqueness on active sessions
+// ─────────────────────────────────────────
+
+model OccupancySession {
+  id               String        @id @default(cuid())
+  userId           String
+  tableId          String
+  requestId        String?       @unique // Optional for admin-created sessions
+  connectionType   ConnectionType
+  status           SessionStatus @default(ACTIVE)
+  startedAt        DateTime      @default(now())
+  endedAt          DateTime?
+  lastActivityAt   DateTime      @default(now())
+  endedBy          String?       // User ID of who ended the session (student or admin)
+
+  // Relations
+  user    User             @relation(fields: [userId], references: [id])
+  table   LabTable         @relation(fields: [tableId], references: [id])
+  request OccupancyRequest? @relation(fields: [requestId], references: [id])
+
+  @@index([userId])
+  @@index([tableId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// ─────────────────────────────────────────
+// AUDIT LOG
+// Append-only — no updates or deletes permitted
+// ─────────────────────────────────────────
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?  // Null for system actions
+  action      String   // e.g. "REQUEST_APPROVED", "TABLE_RELEASED"
+  entityType  String?  // e.g. "OccupancyRequest", "LabTable"
+  entityId    String?
+  metadata    Json?    // Additional context, never includes passwords/tokens
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// NOTIFICATION
+// In-app notifications; not the security mechanism
+// ─────────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String    // e.g. "REQUEST_APPROVED", "TABLE_RELEASED"
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  metadata  Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────
+// SYSTEM SETTING
+// Key-value store for configurable policies
+// ─────────────────────────────────────────
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime @updatedAt
+
+  updatedByUser User? @relation(fields: [updatedBy], references: [id])
+
+  @@index([key])
+}
+

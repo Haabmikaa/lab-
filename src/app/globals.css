@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --background: #101010;
+  --foreground: #ffffff;
+  --onyx: #101010;
+  --indigo: #6321fb;
+  --mint: #6bffc5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-onyx: #101010;
+  --color-indigo: #6321fb;
+  --color-mint: #6bffc5;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background-color: #101010;
+  color: #ffffff;
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom glow effects for Electric Indigo & Tropical Mint */
+.glow-indigo {
+  box-shadow: 0 0 20px -3px rgba(99, 33, 251, 0.4);
+}
+
+.glow-mint {
+  box-shadow: 0 0 20px -3px rgba(107, 255, 197, 0.4);
+}
+
+/* Scrollbar styling for sleek dark mode */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #101010;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6321fb;
+}
