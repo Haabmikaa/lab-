@@ -12,7 +12,7 @@ import type { PublicDashboardData, PublicTable } from '@/types'
 import { toast } from 'sonner'
 import {
   CheckCircle2, Clock, XCircle, AlertTriangle,
-  Loader2, Wifi, WifiOff, ArrowRight, Sparkles
+  Loader2, Wifi, WifiOff, ArrowRight, Sparkles, Cable, ShieldCheck
 } from 'lucide-react'
 import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 
@@ -33,6 +33,13 @@ type OccupancySession = {
   table: { tableCode: string; name: string; hasEthernet: boolean }
 }
 
+type NetworkStatus = {
+  clientIp: string
+  isVerifiedEthernet: boolean
+  verificationEnabled: boolean
+  trustedPatterns: string
+}
+
 export default function StudentDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -41,6 +48,7 @@ export default function StudentDashboard() {
   const [mySession, setMySession] = useState<OccupancySession | null>(null)
   const [myRequests, setMyRequests] = useState<OccupancyRequest[]>([])
   const [selectedTable, setSelectedTable] = useState<PublicTable | null>(null)
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [releasing, setReleasing] = useState(false)
@@ -52,17 +60,19 @@ export default function StudentDashboard() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [tablesRes, sessionRes, requestsRes] = await Promise.all([
+      const [tablesRes, sessionRes, requestsRes, networkRes] = await Promise.all([
         fetch('/api/tables'),
         fetch('/api/sessions'),
         fetch('/api/requests'),
+        fetch('/api/network-status'),
       ])
-      const [tablesJson, sessionJson, requestsJson] = await Promise.all([
-        tablesRes.json(), sessionRes.json(), requestsRes.json(),
+      const [tablesJson, sessionJson, requestsJson, networkJson] = await Promise.all([
+        tablesRes.json(), sessionRes.json(), requestsRes.json(), networkRes.json(),
       ])
       setTableData(tablesJson)
       setMySession(sessionJson.session ?? null)
       setMyRequests(requestsJson.requests ?? [])
+      setNetworkStatus(networkJson)
     } catch {
       toast.error('Failed to load session details')
     } finally {
@@ -92,10 +102,16 @@ export default function StudentDashboard() {
       })
       const data = await res.json()
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to submit request')
+        toast.error(data.error ?? 'Failed to claim table')
         return
       }
-      toast.success('Request submitted — awaiting administrator approval')
+
+      if (data.directOccupancy) {
+        toast.success(data.message ?? 'Verified on Lab Ethernet! Table occupied instantly.')
+      } else {
+        toast.info(data.message ?? 'Request submitted via Hotspot — awaiting administrator approval.')
+      }
+
       setSelectedTable(null)
       await fetchAll()
     } catch {
@@ -189,14 +205,26 @@ export default function StudentDashboard() {
         </div>
 
         {/* Connection classification notice */}
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
-          <WifiOff className="w-5 h-5 text-amber-300 mt-0.5 shrink-0" aria-hidden="true" />
-          <div className="text-xs text-amber-200/90 leading-relaxed">
-            <strong className="text-amber-300">Connection Status: Hotspot / Unverified</strong><br />
-            Your connection is not registered through university Ethernet. 
-            <strong> Administrator approval is required before you can activate a regular student table.</strong>
+        {networkStatus?.isVerifiedEthernet ? (
+          <div className="flex items-start gap-3 rounded-2xl border border-[#6BFFC5]/40 bg-[#6BFFC5]/10 p-4">
+            <ShieldCheck className="w-5 h-5 text-[#6BFFC5] mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="text-xs text-zinc-200 leading-relaxed">
+              <strong className="text-[#6BFFC5] flex items-center gap-1.5 font-bold">
+                <Cable className="w-4 h-4" /> University Lab Ethernet Verified (IP: {networkStatus.clientIp})
+              </strong>
+              You are connected through the official laboratory Ethernet network. You can <strong>take and release Ethernet tables directly</strong> without requiring administrator intervention.
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <WifiOff className="w-5 h-5 text-amber-300 mt-0.5 shrink-0" aria-hidden="true" />
+            <div className="text-xs text-amber-200/90 leading-relaxed">
+              <strong className="text-amber-300">Connection Status: Hotspot / Unverified ({networkStatus?.clientIp || 'Detecting IP...'})</strong><br />
+              Your connection is not registered through university Ethernet. 
+              <strong> Administrator approval is required before you can occupy a student table.</strong>
+            </div>
+          </div>
+        )}
 
         {/* Current active session */}
         {mySession && (
@@ -296,10 +324,25 @@ export default function StudentDashboard() {
             />
 
             {selectedTable && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-[#6321FB] bg-[#6321FB]/20 p-4">
-                <div className="text-xs text-white">
-                  Selected: <strong className="text-[#6BFFC5] font-mono text-sm">{selectedTable.name} ({selectedTable.tableCode})</strong>.
-                  {' '}Submission will notify the laboratory administrator for review.
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-[#6321FB] bg-[#6321FB]/20 p-5">
+                <div className="text-xs text-white space-y-1">
+                  <div>
+                    Selected: <strong className="text-[#6BFFC5] font-mono text-sm">{selectedTable.name} ({selectedTable.tableCode})</strong>
+                    <span className="ml-2 font-mono text-[10px] uppercase px-2 py-0.5 rounded-full bg-white/10 text-zinc-300">
+                      {selectedTable.hasEthernet ? '🔌 Ethernet Table' : '📶 Hotspot Table'}
+                    </span>
+                  </div>
+                  <div className="text-zinc-300 text-[11px]">
+                    {networkStatus?.isVerifiedEthernet && selectedTable.hasEthernet ? (
+                      <span className="text-[#6BFFC5] font-semibold flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" /> Direct Access: Lab Ethernet verified. No administrator approval needed.
+                      </span>
+                    ) : (
+                      <span className="text-amber-300 font-medium flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" /> Requires Approval: Connecting via Hotspot or unverified network.
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
@@ -311,10 +354,16 @@ export default function StudentDashboard() {
                   <button
                     onClick={handleRequestTable}
                     disabled={submitting}
-                    className="rounded-xl bg-[#6BFFC5] text-[#101010] font-bold px-5 py-2 text-xs hover:bg-[#5ae6af] disabled:opacity-50 flex items-center gap-2 uppercase tracking-wider"
+                    className={`rounded-xl font-bold px-5 py-2.5 text-xs disabled:opacity-50 flex items-center gap-2 uppercase tracking-wider shadow-lg transition-all ${
+                      networkStatus?.isVerifiedEthernet && selectedTable.hasEthernet
+                        ? 'bg-[#6BFFC5] text-[#101010] hover:bg-[#5ae6af] shadow-[#6BFFC5]/20'
+                        : 'bg-amber-400 text-black hover:bg-amber-300 shadow-amber-400/20'
+                    }`}
                   >
                     {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    Submit Request
+                    {networkStatus?.isVerifiedEthernet && selectedTable.hasEthernet
+                      ? '🟢 Take Table (Direct Ethernet)'
+                      : '📶 Request Table (Requires Approval)'}
                   </button>
                 </div>
               </div>

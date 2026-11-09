@@ -46,26 +46,32 @@ export async function DELETE(req: NextRequest) {
   const { error, session } = await requireStudent()
   if (error) return error
 
-  let body: unknown
+  let sessionId: string | undefined
   try {
-    body = await req.json()
+    const body = await req.json()
+    sessionId = body?.sessionId
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  const parsed = releaseSessionSchema.safeParse(body)
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 422 })
+    // Empty body is okay, we will find active session below
   }
 
   try {
+    if (!sessionId) {
+      const active = await prisma.occupancySession.findFirst({
+        where: { userId: session!.user.id, status: SessionStatus.ACTIVE },
+      })
+      if (!active) {
+        return NextResponse.json({ error: 'No active session found to release' }, { status: 404 })
+      }
+      sessionId = active.id
+    }
+
     await releaseTable({
-      sessionId: parsed.data.sessionId,
+      sessionId,
       actorId: session!.user.id,
       actorRole: session!.user.role,
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: 'Table released successfully' })
   } catch (err) {
     if (err instanceof OccupancyError) {
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })

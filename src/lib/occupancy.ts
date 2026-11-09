@@ -455,3 +455,81 @@ export async function cancelRequest({
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
+/**
+ * Direct table occupancy for verified university Ethernet connections.
+ * Bypasses admin approval when connection is verified on university lab network.
+ */
+export async function directOccupyTable({
+  userId,
+  tableId,
+  clientIpAddress,
+  userAgent,
+}: {
+  userId: string
+  tableId: string
+  clientIpAddress?: string
+  userAgent?: string
+}) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Verify table exists, is REGULAR, and is AVAILABLE
+    const table = await tx.labTable.findUnique({ where: { id: tableId } })
+    if (!table) throw new OccupancyError('Table not found', 'TABLE_NOT_FOUND')
+    if (!table.isActive) throw new OccupancyError('Table is not active', 'TABLE_INACTIVE')
+    if (table.tableType !== TableType.REGULAR)
+      throw new OccupancyError('Cannot occupy a reserved table', 'TABLE_RESERVED')
+    if (table.status !== TableStatus.AVAILABLE)
+      throw new OccupancyError('Table is not available', 'TABLE_NOT_AVAILABLE')
+
+    // 2. Verify student has no active session
+    const activeSession = await tx.occupancySession.findFirst({
+      where: { userId, status: SessionStatus.ACTIVE },
+    })
+    if (activeSession)
+      throw new OccupancyError('You already have an active table session', 'ALREADY_OCCUPIED')
+
+    // 3. Clear old pending requests
+    await tx.occupancyRequest.updateMany({
+      where: {
+        userId,
+        status: { in: [RequestStatus.PENDING_APPROVAL, RequestStatus.APPROVED] },
+      },
+      data: { status: RequestStatus.CANCELLED },
+    })
+
+    // 4. Update table to OCCUPIED
+    await tx.labTable.update({
+      where: { id: tableId },
+      data: { status: TableStatus.OCCUPIED },
+    })
+
+    // 5. Create instant active session
+    const session = await tx.occupancySession.create({
+      data: {
+        userId,
+        tableId,
+        connectionType: ConnectionType.ETHERNET,
+        status: SessionStatus.ACTIVE,
+      },
+      include: {
+        table: true,
+        user: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    // 6. Log audit event
+    await auditLog({
+      actorUserId: userId,
+      action: AuditAction.SESSION_STARTED,
+      entityType: 'OccupancySession',
+      entityId: session.id,
+      metadata: { tableId, tableCode: table.tableCode, connectionType: ConnectionType.ETHERNET, verifiedEthernet: true },
+      ipAddress: clientIpAddress,
+    })
+
+    sseEmit('table:occupied', { tableId, tableCode: table.tableCode })
+
+    return session
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
+}
+
+

@@ -1,9 +1,10 @@
-// app/api/requests/route.ts — Student: submit occupancy request
+// app/api/requests/route.ts — Student: submit occupancy request or direct occupy on verified network
 import { NextRequest, NextResponse } from 'next/server'
 import { requireStudent } from '@/lib/rbac'
-import { submitOccupancyRequest, OccupancyError } from '@/lib/occupancy'
+import { submitOccupancyRequest, directOccupyTable, OccupancyError } from '@/lib/occupancy'
 import { submitRequestSchema } from '@/lib/validations'
-import { ConnectionType } from '@prisma/client'
+import { verifyClientNetwork } from '@/lib/network'
+import { prisma } from '@/lib/db'
 import { checkRateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
@@ -13,8 +14,8 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireStudent()
   if (error) return error
 
-  // Rate limit: max 5 requests per 5 minutes per user
-  const rl = checkRateLimit(`request:${session!.user.id}`, 5, 5 * 60 * 1000, 10 * 60 * 1000)
+  // Rate limit: max 10 requests per 5 minutes per user
+  const rl = checkRateLimit(`request:${session!.user.id}`, 10, 5 * 60 * 1000, 10 * 60 * 1000)
   if (!rl.allowed) {
     return NextResponse.json(
       { error: 'Too many requests. Please wait before trying again.' },
@@ -37,22 +38,60 @@ export async function POST(req: NextRequest) {
 
   const { tableId } = parsed.data
 
-  // IMPORTANT: connectionType is determined server-side only.
-  // Client may suggest it, but we always default to UNVERIFIED unless
-  // a trusted IT integration provides verified evidence.
-  // TODO: When IT provides RADIUS/802.1X/VLAN integration, add verification here.
-  const connectionType: ConnectionType = ConnectionType.UNVERIFIED
-
   try {
+    // 1. Fetch table details to verify hardware Ethernet capability
+    const table = await prisma.labTable.findUnique({
+      where: { id: tableId },
+    })
+
+    if (!table) {
+      return NextResponse.json({ error: 'Table not found' }, { status: 404 })
+    }
+
+    // 2. Perform server-side IP & Network Verification
+    const networkVerification = await verifyClientNetwork(req, table.hasEthernet)
+
+    // 3. CORE LOGIC:
+    // If student is physically on the verified university lab Ethernet and table has Ethernet port:
+    // -> Instant Direct Access (No admin intervention needed, user can toggle ON/OFF)
+    if (networkVerification.isVerifiedEthernet) {
+      const activeSession = await directOccupyTable({
+        userId: session!.user.id,
+        tableId,
+        clientIpAddress: networkVerification.clientIp,
+        userAgent: req.headers.get('user-agent') ?? undefined,
+      })
+
+      return NextResponse.json(
+        {
+          success: true,
+          directOccupancy: true,
+          session: activeSession,
+          message: 'Connected via Lab Ethernet. Table occupied directly without requiring approval.',
+        },
+        { status: 201 }
+      )
+    }
+
+    // Otherwise: Table is Hotspot-only or user is on mobile hotspot/unverified network:
+    // -> Strict administrative approval required
     const request = await submitOccupancyRequest({
       userId: session!.user.id,
       tableId,
-      connectionType,
-      clientIpAddress: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
+      connectionType: networkVerification.connectionType,
+      clientIpAddress: networkVerification.clientIp,
       userAgent: req.headers.get('user-agent') ?? undefined,
     })
 
-    return NextResponse.json({ request }, { status: 201 })
+    return NextResponse.json(
+      {
+        success: true,
+        directOccupancy: false,
+        request,
+        message: 'Connected via Hotspot. Awaiting administrator approval.',
+      },
+      { status: 201 }
+    )
   } catch (err) {
     if (err instanceof OccupancyError) {
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
