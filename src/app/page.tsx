@@ -15,10 +15,10 @@ export default function PublicDashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  const fetchTables = useCallback(async () => {
+  const fetchTables = useCallback(async (isManual = false) => {
     try {
-      setRefreshing(true)
-      const res = await fetch('/api/tables')
+      if (isManual) setRefreshing(true)
+      const res = await fetch('/api/tables', { cache: 'no-store' })
       if (res.ok) {
         const json: PublicDashboardData = await res.json()
         setData(json)
@@ -27,12 +27,31 @@ export default function PublicDashboard() {
       // Handled silently with cached/fallback data
     } finally {
       setLoading(false)
-      setRefreshing(false)
+      if (isManual) setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchTables()
+    fetchTables(true)
+
+    // Background sync every 3 seconds
+    const interval = setInterval(() => {
+      fetchTables(false)
+    }, 3000)
+
+    const handleFocus = () => fetchTables(false)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchTables(false)
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [fetchTables])
 
   const handleSSEUpdate = useCallback((type: string, payload: unknown) => {
@@ -99,7 +118,7 @@ export default function PublicDashboard() {
             <div className="flex flex-wrap items-center gap-3">
               <LiveStatusBadge status={sseStatus} />
               <button
-                onClick={fetchTables}
+                onClick={() => fetchTables(true)}
                 disabled={refreshing}
                 className="inline-flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-all disabled:opacity-50"
                 aria-label="Refresh table data"

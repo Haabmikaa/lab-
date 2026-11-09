@@ -58,13 +58,13 @@ export default function StudentDashboard() {
     if (status === 'unauthenticated') router.replace('/login')
   }, [status, router])
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (isInitial = false) => {
     try {
       const [tablesRes, sessionRes, requestsRes, networkRes] = await Promise.all([
-        fetch('/api/tables'),
-        fetch('/api/sessions'),
-        fetch('/api/requests'),
-        fetch('/api/network-status'),
+        fetch('/api/tables', { cache: 'no-store' }),
+        fetch('/api/sessions', { cache: 'no-store' }),
+        fetch('/api/requests', { cache: 'no-store' }),
+        fetch('/api/network-status', { cache: 'no-store' }),
       ])
       const [tablesJson, sessionJson, requestsJson, networkJson] = await Promise.all([
         tablesRes.json(), sessionRes.json(), requestsRes.json(), networkRes.json(),
@@ -74,17 +74,40 @@ export default function StudentDashboard() {
       setMyRequests(requestsJson.requests ?? [])
       setNetworkStatus(networkJson)
     } catch {
-      toast.error('Failed to load session details')
+      if (isInitial) toast.error('Failed to load session details')
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (status === 'authenticated') fetchAll()
+    if (status !== 'authenticated') return
+
+    // 1. Initial immediate load
+    fetchAll(true)
+
+    // 2. Real-time background live sync (every 3 seconds)
+    const interval = setInterval(() => {
+      fetchAll(false)
+    }, 3000)
+
+    // 3. Immediate refetch on window focus / tab active
+    const handleFocus = () => fetchAll(false)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchAll(false)
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [status, fetchAll])
 
-  const sseStatus = useTableSSE(useCallback((_type: string) => { fetchAll() }, [fetchAll]))
+  const sseStatus = useTableSSE(useCallback((_type: string) => { fetchAll(false) }, [fetchAll]))
 
   const activePendingRequest = myRequests.find((r) => r.status === 'PENDING_APPROVAL')
   const activeApprovedRequest = myRequests.find(

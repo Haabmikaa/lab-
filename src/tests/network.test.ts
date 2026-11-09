@@ -38,3 +38,4 @@ describe('Lab Network IP Verification (10.240.72.1 to 10.240.72.225)', () => {
     expect(isIpMatch('::1', '::1')).toBe(true)
   })
 })
+

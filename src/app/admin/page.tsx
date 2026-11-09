@@ -70,12 +70,12 @@ export default function AdminDashboard() {
     if (status === 'authenticated' && session?.user?.role !== 'ADMIN') router.replace('/dashboard')
   }, [status, session, router])
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (isInitial = false) => {
     try {
       const [tablesRes, adminTablesRes, requestsRes] = await Promise.all([
-        fetch('/api/tables'),
-        fetch('/api/admin/tables'),
-        fetch('/api/admin/requests?status=PENDING_APPROVAL&limit=50'),
+        fetch('/api/tables', { cache: 'no-store' }),
+        fetch('/api/admin/tables', { cache: 'no-store' }),
+        fetch('/api/admin/requests?status=PENDING_APPROVAL&limit=50', { cache: 'no-store' }),
       ])
       const [tablesJson, adminTablesJson, requestsJson] = await Promise.all([
         tablesRes.json(), adminTablesRes.json(), requestsRes.json(),
@@ -86,15 +86,38 @@ export default function AdminDashboard() {
     } catch {
       // Handled silently
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (status === 'authenticated') fetchAll()
+    if (status !== 'authenticated') return
+
+    // 1. Initial immediate load
+    fetchAll(true)
+
+    // 2. Real-time background sync (every 3 seconds)
+    const interval = setInterval(() => {
+      fetchAll(false)
+    }, 3000)
+
+    // 3. Immediate refetch on window focus / tab active
+    const handleFocus = () => fetchAll(false)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchAll(false)
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [status, fetchAll])
 
-  const sseStatus = useTableSSE(useCallback((_: string) => { fetchAll() }, [fetchAll]))
+  const sseStatus = useTableSSE(useCallback((_: string) => { fetchAll(false) }, [fetchAll]))
 
   async function handleApprove(requestId: string) {
     setApproving(requestId)
@@ -250,7 +273,7 @@ export default function AdminDashboard() {
           <div className="flex items-center gap-3">
             <LiveStatusBadge status={sseStatus} />
             <button
-              onClick={fetchAll}
+              onClick={() => fetchAll(true)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3.5 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5 text-[#6BFFC5]" aria-hidden="true" />
