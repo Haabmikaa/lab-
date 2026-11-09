@@ -83,18 +83,18 @@ export function TableCard({ table, onClick, selected, disabled, compact = false 
         </div>
       )}
 
-      {/* Ethernet vs Mobile Table Mode */}
+      {/* Ethernet Table vs Hotspot Table Mode */}
       {!compact && table.tableType === 'REGULAR' && (
         <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium">
           {table.hasEthernet ? (
             <span className="inline-flex items-center gap-1 text-[#6BFFC5]">
               <Cable className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Ethernet Port Table</span>
+              <span>Ethernet Table</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-amber-300">
-              <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Mobile Table (Hotspot)</span>
+              <Wifi className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Hotspot Table</span>
             </span>
           )}
         </div>
