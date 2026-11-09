@@ -12,7 +12,7 @@ import type { PublicDashboardData, PublicTable } from '@/types'
 import { toast } from 'sonner'
 import {
   CheckCircle2, Clock, XCircle, AlertTriangle,
-  Loader2, Wifi, WifiOff, ArrowRight, Sparkles, Cable, ShieldCheck
+  Loader2, Wifi, WifiOff, ArrowRight, Sparkles, Cable, ShieldCheck, KeyRound
 } from 'lucide-react'
 import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 
@@ -53,6 +53,36 @@ export default function StudentDashboard() {
   const [submitting, setSubmitting] = useState(false)
   const [releasing, setReleasing] = useState(false)
   const [activating, setActivating] = useState(false)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  async function handleStudentChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!currentPassword || !newPassword) return
+    setChangingPassword(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Failed to update password')
+        return
+      }
+      toast.success('Your password was updated successfully!')
+      setPasswordModalOpen(false)
+      setCurrentPassword('')
+      setNewPassword('')
+    } catch {
+      toast.error('Network error updating password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login')
@@ -224,7 +254,17 @@ export default function StudentDashboard() {
               Account: {session?.user?.email}
             </p>
           </div>
-          <LiveStatusBadge status={sseStatus} />
+          <div className="flex items-center gap-2.5">
+            <LiveStatusBadge status={sseStatus} />
+            <button
+              onClick={() => { setPasswordModalOpen(true); setCurrentPassword(''); setNewPassword('') }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-all"
+              title="Change your password"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-[#c4b5fd]" />
+              Password
+            </button>
+          </div>
         </div>
 
         {/* Connection classification notice */}
@@ -413,6 +453,78 @@ export default function StudentDashboard() {
                   <RequestStatusBadge status={r.status} />
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Change Password Modal */}
+        {passwordModalOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Change Account Password"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          >
+            <div className="w-full max-w-md bg-[#141414] rounded-3xl border border-white/15 shadow-2xl p-6 sm:p-8 space-y-5">
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white font-mono flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-[#6BFFC5]" />
+                  Change Password
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Update password for {session?.user?.email}
+                </p>
+              </div>
+
+              <form onSubmit={handleStudentChangePassword} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono text-zinc-300 uppercase">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter your current password"
+                    className="w-full rounded-xl bg-black/60 border border-white/15 px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono text-zinc-300 uppercase">
+                    New Password (min 8 chars, 1 uppercase, 1 number)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter your new password"
+                    className="w-full rounded-xl bg-black/60 border border-white/15 px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setPasswordModalOpen(false); setCurrentPassword(''); setNewPassword('') }}
+                    className="rounded-xl border border-white/10 px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={changingPassword || !currentPassword || newPassword.length < 8}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] font-bold px-4 py-2 text-xs hover:bg-[#5ae6af] uppercase tracking-wider disabled:opacity-40 transition-all shadow-md shadow-[#6BFFC5]/20"
+                  >
+                    {changingPassword && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#101010]" />}
+                    Update Password
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

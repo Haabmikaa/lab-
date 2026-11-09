@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import {
   Clock, CheckCircle2, XCircle, Users, Shield,
   Loader2, RefreshCw, Wrench, LogOut, AlertTriangle, Settings, Save, UserPlus,
-  Cable, Wifi, Lock, Unlock, UserCheck
+  Cable, Wifi, Lock, Unlock, UserCheck, Trash2, KeyRound
 } from 'lucide-react'
 import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
@@ -64,6 +64,36 @@ export default function AdminDashboard() {
   const [approving, setApproving] = useState<string | null>(null)
   const [rejectDialog, setRejectDialog] = useState<RejectDialogState>({ open: false, requestId: '', reason: '' })
   const [rejecting, setRejecting] = useState(false)
+  const [selfPasswordModal, setSelfPasswordModal] = useState(false)
+  const [selfCurrentPassword, setSelfCurrentPassword] = useState('')
+  const [selfNewPassword, setSelfNewPassword] = useState('')
+  const [selfChanging, setSelfChanging] = useState(false)
+
+  async function handleSelfChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selfCurrentPassword || !selfNewPassword) return
+    setSelfChanging(true)
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: selfCurrentPassword, newPassword: selfNewPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Failed to update password')
+        return
+      }
+      toast.success('Your password has been updated successfully!')
+      setSelfPasswordModal(false)
+      setSelfCurrentPassword('')
+      setSelfNewPassword('')
+    } catch {
+      toast.error('Network error updating password')
+    } finally {
+      setSelfChanging(false)
+    }
+  }
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/login')
@@ -270,8 +300,16 @@ export default function AdminDashboard() {
               {pendingRequests.length} occupancy request{pendingRequests.length !== 1 ? 's' : ''} awaiting review
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
             <LiveStatusBadge status={sseStatus} />
+            <button
+              onClick={() => { setSelfPasswordModal(true); setSelfCurrentPassword(''); setSelfNewPassword('') }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-all"
+              title="Change your admin password"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-[#c4b5fd]" aria-hidden="true" />
+              Password
+            </button>
             <button
               onClick={() => fetchAll(true)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3.5 py-2 text-xs font-medium text-zinc-300 hover:text-white transition-all"
@@ -616,13 +654,90 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Self Change Password Modal */}
+      {selfPasswordModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Change Admin Password"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+        >
+          <div className="w-full max-w-md bg-[#141414] rounded-3xl border border-white/15 shadow-2xl p-6 sm:p-8 space-y-5">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white font-mono flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[#6BFFC5]" />
+                Change Your Password
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Update the password for your administrator account ({session?.user?.email})
+              </p>
+            </div>
+
+            <form onSubmit={handleSelfChangePassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-mono text-zinc-300 uppercase">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={selfCurrentPassword}
+                  onChange={(e) => setSelfCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full rounded-xl bg-black/60 border border-white/15 px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-mono text-zinc-300 uppercase">
+                  New Password (min 8 chars, 1 uppercase, 1 number)
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={selfNewPassword}
+                  onChange={(e) => setSelfNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  className="w-full rounded-xl bg-black/60 border border-white/15 px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setSelfPasswordModal(false); setSelfCurrentPassword(''); setSelfNewPassword('') }}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={selfChanging || !selfCurrentPassword || selfNewPassword.length < 8}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] font-bold px-4 py-2 text-xs hover:bg-[#5ae6af] uppercase tracking-wider disabled:opacity-40 transition-all shadow-md shadow-[#6BFFC5]/20"
+                >
+                  {selfChanging && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#101010]" />}
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function AdminUsersPanel() {
+  const { data: session } = useSession()
   const [users, setUsers] = useState<unknown[]>([])
   const [loading, setLoading] = useState(true)
+  const [passwordModalUser, setPasswordModalUser] = useState<{ id: string; name: string; email: string } | null>(null)
+  const [newPasswordValue, setNewPasswordValue] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
 
   const loadUsers = useCallback(() => {
     fetch('/api/admin/users')
@@ -654,10 +769,62 @@ function AdminUsersPanel() {
     }
   }
 
+  async function handleDeleteUser(userId: string, name: string, email: string) {
+    if (!confirm(`Are you sure you want to permanently delete user "${name}" (${email})?\n\nThis will remove their account and historical records. This action cannot be undone.`)) return
+
+    setDeletingUserId(userId)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Failed to delete user')
+        return
+      }
+      toast.success(`User ${email} permanently deleted`)
+      loadUsers()
+    } catch {
+      toast.error('Network error deleting user')
+    } finally {
+      setDeletingUserId(null)
+    }
+  }
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!passwordModalUser) return
+    if (!newPasswordValue || newPasswordValue.length < 8) {
+      toast.error('Password must be at least 8 characters long')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await fetch(`/api/admin/users/${passwordModalUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'change_password', password: newPasswordValue }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Failed to update password')
+        return
+      }
+      toast.success(data.message ?? 'Password updated successfully')
+      setPasswordModalUser(null)
+      setNewPasswordValue('')
+    } catch {
+      toast.error('Network error changing password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   if (loading) return <div className="animate-pulse h-48 bg-white/5 rounded-3xl" />
 
   return (
-    <div className="bg-[#141414] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
+    <div className="bg-[#141414] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 relative">
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
           <Users className="w-4 h-4 text-[#6BFFC5]" aria-hidden="true" />
@@ -683,38 +850,125 @@ function AdminUsersPanel() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {(users as Array<{ id: string; name: string; email: string; role: string; accountStatus: string }>).map((u) => (
-              <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                <td className="py-3 px-3 font-semibold text-white">{u.name}</td>
-                <td className="py-3 px-3 text-zinc-400 font-mono">{u.email}</td>
-                <td className="py-3 px-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
+            {(users as Array<{ id: string; name: string; email: string; role: string; accountStatus: string }>).map((u) => {
+              const isSelf = u.id === session?.user?.id
+              return (
+                <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                  <td className="py-3 px-3 font-semibold text-white">
+                    {u.name} {isSelf && <span className="ml-1 text-[10px] font-mono text-zinc-400">(You)</span>}
+                  </td>
+                  <td className="py-3 px-3 text-zinc-400 font-mono">{u.email}</td>
+                  <td className="py-3 px-3">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
+                      u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
                     }`}>{u.role}</span>
-                </td>
-                <td className="py-3 px-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
+                  </td>
+                  <td className="py-3 px-3">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
+                      u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
                       u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
-                        'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                     }`}>{u.accountStatus}</span>
-                </td>
-                <td className="py-3 px-3 text-right">
-                  {u.role !== 'ADMIN' && (
-                    <button
-                      onClick={() => handleToggleStatus(u.id, u.accountStatus, u.name)}
-                      className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${u.accountStatus === 'ACTIVE'
-                          ? 'border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white'
-                          : 'border border-[#6BFFC5]/40 text-[#6BFFC5] hover:bg-[#6BFFC5] hover:text-[#101010]'
-                        }`}
-                    >
-                      {u.accountStatus === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {/* Password reset button */}
+                      <button
+                        onClick={() => { setPasswordModalUser(u); setNewPasswordValue('') }}
+                        title="Change user password"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-[#6321FB]/20 border border-[#6321FB]/40 text-[#c4b5fd] hover:bg-[#6321FB] hover:text-white transition-all"
+                      >
+                        <KeyRound className="w-3 h-3" />
+                        Password
+                      </button>
+
+                      {/* Deactivate/Reactivate button */}
+                      {!isSelf && u.role !== 'ADMIN' && (
+                        <button
+                          onClick={() => handleToggleStatus(u.id, u.accountStatus, u.name)}
+                          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${
+                            u.accountStatus === 'ACTIVE'
+                              ? 'border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black'
+                              : 'border border-[#6BFFC5]/40 text-[#6BFFC5] hover:bg-[#6BFFC5] hover:text-[#101010]'
+                          }`}
+                        >
+                          {u.accountStatus === 'ACTIVE' ? 'Disable' : 'Enable'}
+                        </button>
+                      )}
+
+                      {/* Delete user button */}
+                      {!isSelf && (
+                        <button
+                          onClick={() => handleDeleteUser(u.id, u.name, u.email)}
+                          disabled={deletingUserId === u.id}
+                          title="Permanently delete user"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white transition-all disabled:opacity-50"
+                        >
+                          {deletingUserId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
+
+      {/* Change Password Modal */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#141414] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5">
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-white font-mono flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-[#6BFFC5]" />
+                Change Password
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Updating password for <strong className="text-white">{passwordModalUser.name}</strong> ({passwordModalUser.email})
+              </p>
+            </div>
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-mono text-zinc-300 uppercase">
+                  New Password (min 8 characters)
+                </label>
+                <input
+                  type="text"
+                  required
+                  minLength={8}
+                  value={newPasswordValue}
+                  onChange={(e) => setNewPasswordValue(e.target.value)}
+                  placeholder="Enter new strong password"
+                  className="w-full rounded-xl bg-black/60 border border-white/15 px-3.5 py-2.5 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
+                  autoFocus
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => { setPasswordModalUser(null); setNewPasswordValue('') }}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={changingPassword || newPasswordValue.length < 8}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] font-bold px-4 py-2 text-xs hover:bg-[#5ae6af] uppercase tracking-wider disabled:opacity-40 transition-all shadow-md shadow-[#6BFFC5]/20"
+                >
+                  {changingPassword && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#101010]" />}
+                  Update Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
