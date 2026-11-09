@@ -152,7 +152,7 @@ export async function approveRequest({
     )
       throw new OccupancyError('Table is no longer available', 'TABLE_NOT_AVAILABLE')
 
-    const approvalExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    const approvalExpiry = new Date(Date.now() + (await getApprovalExpiryMs()))
 
     // Update request status
     await tx.occupancyRequest.update({
@@ -172,25 +172,13 @@ export async function approveRequest({
         decision: ApprovalDecision.APPROVED,
         reason: reason ?? null,
         expiresAt: approvalExpiry,
-        usedAt: new Date(),
       },
     })
 
-    // Immediately start active occupancy session for the student upon admin approval
-    const session = await tx.occupancySession.create({
-      data: {
-        userId: request.userId,
-        tableId: request.tableId,
-        requestId: request.id,
-        connectionType: request.connectionType,
-        status: SessionStatus.ACTIVE,
-      },
-    })
-
-    // Transition table directly to OCCUPIED
+    // Update table status to APPROVED
     await tx.labTable.update({
       where: { id: request.tableId },
-      data: { status: TableStatus.OCCUPIED },
+      data: { status: TableStatus.APPROVED },
     })
 
     await auditLog({
@@ -198,13 +186,12 @@ export async function approveRequest({
       action: AuditAction.REQUEST_APPROVED,
       entityType: 'OccupancyRequest',
       entityId: requestId,
-      metadata: { tableId: request.tableId, tableCode: request.table.tableCode, studentId: request.userId, approvalId: approval.id, sessionId: session.id },
+      metadata: { tableId: request.tableId, tableCode: request.table.tableCode, studentId: request.userId, approvalId: approval.id },
     })
 
-    sseEmit('table:occupied', { tableId: request.tableId, tableCode: request.table.tableCode })
     sseEmit('request:approved', { requestId, userId: request.userId, tableCode: request.table.tableCode })
 
-    return { request, approval, session }
+    return { request, approval }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 

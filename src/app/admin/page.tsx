@@ -12,7 +12,8 @@ import type { PublicDashboardData } from '@/types'
 import { toast } from 'sonner'
 import {
   Clock, CheckCircle2, XCircle, Users, Shield,
-  Loader2, RefreshCw, Wrench, LogOut, AlertTriangle, Settings, Save, UserPlus
+  Loader2, RefreshCw, Wrench, LogOut, AlertTriangle, Settings, Save, UserPlus,
+  Cable, Smartphone
 } from 'lucide-react'
 import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
@@ -156,6 +157,22 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Failed'); return }
       toast.success(enable ? 'Table set to maintenance' : 'Table restored to available')
+      await fetchAll()
+    } catch { toast.error('Network error') }
+  }
+
+  async function handleToggleEthernet(tableId: string, currentHasEthernet: boolean, tableCode: string) {
+    const newHasEthernet = !currentHasEthernet
+    const modeLabel = newHasEthernet ? 'Ethernet Port Table' : 'Mobile Table (Hotspot required)'
+    try {
+      const res = await fetch(`/api/admin/tables/${tableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hasEthernet: newHasEthernet }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to update table mode'); return }
+      toast.success(`${tableCode} set to ${modeLabel}`)
       await fetchAll()
     } catch { toast.error('Network error') }
   }
@@ -362,6 +379,35 @@ export default function AdminDashboard() {
                             <CheckCircle2 className="w-3 h-3" /> Restore Table
                           </button>
                         )}
+                      </div>
+                    )}
+
+                    {/* Table Network Mode: Ethernet Port vs Mobile Table Toggle */}
+                    {table.tableType === 'REGULAR' && (
+                      <div className="pt-2.5 border-t border-white/10 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {table.hasEthernet ? (
+                            <span className="inline-flex items-center gap-1 font-mono text-[11px] text-[#6BFFC5] font-semibold bg-[#6BFFC5]/10 border border-[#6BFFC5]/30 px-2 py-0.5 rounded-lg">
+                              <Cable className="w-3 h-3 shrink-0" /> Ethernet Port Table
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 font-mono text-[11px] text-amber-300 font-semibold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg">
+                              <Smartphone className="w-3 h-3 shrink-0" /> Mobile Table (Hotspot)
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => handleToggleEthernet(table.id, table.hasEthernet, table.tableCode)}
+                          className={`shrink-0 text-[10px] font-mono uppercase px-2.5 py-1 rounded-lg border font-bold transition-all ${
+                            table.hasEthernet
+                              ? 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'
+                              : 'bg-[#6BFFC5]/15 border-[#6BFFC5]/30 text-[#6BFFC5] hover:bg-[#6BFFC5]/25'
+                          }`}
+                          title={table.hasEthernet ? 'Switch to Mobile Table (Hotspot)' : 'Switch to Ethernet Port Table'}
+                        >
+                          Set as {table.hasEthernet ? 'Mobile' : 'Ethernet'}
+                        </button>
                       </div>
                     )}
                   </div>

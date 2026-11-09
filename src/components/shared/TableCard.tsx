@@ -6,6 +6,8 @@ import {
   Monitor,
   Wifi,
   WifiOff,
+  Cable,
+  Smartphone,
   Clock,
   CheckCircle2,
   XCircle,
@@ -81,15 +83,20 @@ export function TableCard({ table, onClick, selected, disabled, compact = false 
         </div>
       )}
 
-      {/* Ethernet socket condition */}
+      {/* Ethernet vs Mobile Table Mode */}
       {!compact && table.tableType === 'REGULAR' && (
-        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-zinc-400">
-          {table.hasEthernet
-            ? <Wifi className="w-3.5 h-3.5 text-[#6BFFC5]" aria-label="Ethernet available" />
-            : <WifiOff className="w-3.5 h-3.5 text-zinc-500" aria-label="No Ethernet" />}
-          <span className={table.hasEthernet ? 'text-zinc-300' : 'text-zinc-500'}>
-            {table.hasEthernet ? 'Ethernet Port' : 'Hotspot Table'}
-          </span>
+        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium">
+          {table.hasEthernet ? (
+            <span className="inline-flex items-center gap-1 text-[#6BFFC5]">
+              <Cable className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Ethernet Port Table</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-amber-300">
+              <Smartphone className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Mobile Table (Hotspot)</span>
+            </span>
+          )}
         </div>
       )}
 

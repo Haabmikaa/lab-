@@ -7,6 +7,7 @@ import { TableStatus, SessionStatus } from '@prisma/client'
 import { auditLog, AuditAction } from '@/lib/audit'
 import { releaseTable, OccupancyError } from '@/lib/occupancy'
 import { sseEmit } from '@/lib/sse'
+import { invalidateTablesCache } from '@/app/api/tables/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         entityType: 'LabTable',
         entityId: id,
         metadata: parsed.data,
+      })
+
+      invalidateTablesCache()
+      sseEmit('table:updated', {
+        tableId: id,
+        tableCode: table.tableCode,
+        hasEthernet: table.hasEthernet,
+        status: table.status,
       })
 
       return NextResponse.json({ table })
