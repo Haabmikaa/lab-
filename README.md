@@ -1,6 +1,6 @@
 # University Computer Laboratory Table Occupancy Management System
 
-A secure, responsive full-stack web application for monitoring and managing table occupancy in a university computer laboratory.
+A secure, responsive full-stack web application for monitoring and managing table occupancy in a university computer laboratory. Powered by Supabase PostgreSQL and deployed on Vercel.
 
 ---
 
