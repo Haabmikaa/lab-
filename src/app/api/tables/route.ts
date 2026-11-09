@@ -48,7 +48,26 @@ const FALLBACK_TABLES: PublicTable[] = [
   },
 ]
 
+// In-memory short-lived cache (3s) to eliminate remote database round-trips for rapid page loads
+let cachedData: { tables: PublicTable[]; stats: Record<string, number>; lastUpdated: string } | null = null
+let cacheExpiresAt = 0
+
+export function invalidateTablesCache() {
+  cacheExpiresAt = 0
+  cachedData = null
+}
+
 export async function GET() {
+  const now = Date.now()
+  if (cachedData && now < cacheExpiresAt) {
+    return NextResponse.json(cachedData, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10',
+        'X-Cache': 'HIT',
+      },
+    })
+  }
+
   try {
     let tables: PublicTable[] = []
     try {
@@ -66,7 +85,7 @@ export async function GET() {
         orderBy: { sortOrder: 'asc' },
       })
     } catch (dbErr) {
-      console.warn('[GET /api/tables] Database offline or unseeded, using laboratory fallback:', (dbErr as Error).message)
+      console.warn('[GET /api/tables] Database connection waking up, using fallback:', (dbErr as Error).message)
       tables = FALLBACK_TABLES
     }
 
@@ -84,10 +103,14 @@ export async function GET() {
       maintenance: tables.filter((t) => t.status === 'MAINTENANCE').length,
     }
 
-    return NextResponse.json({
-      tables,
-      stats,
-      lastUpdated: new Date().toISOString(),
+    cachedData = { tables, stats, lastUpdated: new Date().toISOString() }
+    cacheExpiresAt = now + 3000 // 3 seconds TTL
+
+    return NextResponse.json(cachedData, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=10',
+        'X-Cache': 'MISS',
+      },
     })
   } catch (err) {
     console.error('[GET /api/tables] Fatal error:', err)

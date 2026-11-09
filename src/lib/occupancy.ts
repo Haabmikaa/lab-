@@ -118,7 +118,7 @@ export async function submitOccupancyRequest({
     sseEmit('request:new', { requestId: request.id, tableCode: table.tableCode })
 
     return request
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
 // ─── Admin: approve a request ────────────────────────────────────────────────
@@ -192,7 +192,7 @@ export async function approveRequest({
     sseEmit('request:approved', { requestId, userId: request.userId, tableCode: request.table.tableCode })
 
     return { request, approval }
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
 // ─── Admin: reject a request ─────────────────────────────────────────────────
@@ -252,7 +252,7 @@ export async function rejectRequest({
     sseEmit('request:rejected', { requestId, userId: request.userId, tableCode: request.table.tableCode })
 
     return request
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
 // ─── Activate an approved request (student activates table) ──────────────────
@@ -346,7 +346,7 @@ export async function activateApprovedRequest({
     sseEmit('table:occupied', { tableId: request.tableId, tableCode: table.tableCode })
 
     return session
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
 // ─── Release a table ──────────────────────────────────────────────────────────
@@ -403,7 +403,7 @@ export async function releaseTable({
     sseEmit('table:available', { tableId: session.tableId, tableCode: session.table.tableCode })
 
     return session
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
 // ─── Cancel a pending/approved request ───────────────────────────────────────
@@ -452,6 +452,6 @@ export async function cancelRequest({
     sseEmit('table:available', { tableId: request.tableId, tableCode: request.table.tableCode })
 
     return request
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 

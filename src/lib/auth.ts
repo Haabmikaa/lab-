@@ -90,19 +90,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.accountStatus = (user as { accountStatus: AccountStatus }).accountStatus
       }
 
-      if (token.id) {
+      // Only refresh from database in Node.js runtime (avoids crashing Next.js Edge Middleware)
+      if (token.id && process.env.NEXT_RUNTIME === 'nodejs') {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { role: true, accountStatus: true, emailVerifiedAt: true },
+            select: { role: true, accountStatus: true },
           })
           if (!dbUser || dbUser.accountStatus === AccountStatus.DISABLED) {
             return { ...token, error: 'AccountDisabled' }
           }
           token.role = dbUser.role
           token.accountStatus = dbUser.accountStatus
-        } catch (err) {
-          console.error('[auth] JWT refresh error:', err)
+        } catch {
+          // Keep token properties if temporary DB network glitch
         }
       }
 
