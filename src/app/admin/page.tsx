@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import {
   Clock, CheckCircle2, XCircle, Users, Shield,
   Loader2, RefreshCw, Wrench, LogOut, AlertTriangle, Settings, Save, UserPlus,
-  Cable, Wifi
+  Cable, Wifi, Lock, Unlock, UserCheck
 } from 'lucide-react'
 import { formatRelativeTime, formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
@@ -177,6 +177,44 @@ export default function AdminDashboard() {
     } catch { toast.error('Network error') }
   }
 
+  async function handleToggleReservation(tableId: string, currentTableType: string, tableCode: string) {
+    const isCurrentlyReserved = currentTableType === 'RESERVED'
+    const newType = isCurrentlyReserved ? 'REGULAR' : 'RESERVED'
+    const newStatus = isCurrentlyReserved ? 'AVAILABLE' : 'RESERVED'
+    const confirmMsg = isCurrentlyReserved
+      ? `Release representative reservation for ${tableCode}? Ordinary students will now be able to request this table.`
+      : `Reserve ${tableCode} permanently for Laboratory Representatives? Students will not be able to claim it.`
+
+    if (!confirm(confirmMsg)) return
+
+    try {
+      const res = await fetch(`/api/admin/tables/${tableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tableType: newType, status: newStatus }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to update reservation'); return }
+      toast.success(isCurrentlyReserved ? `${tableCode} released as Regular student table` : `${tableCode} reserved for Representatives`)
+      await fetchAll()
+    } catch { toast.error('Network error') }
+  }
+
+  async function handleToggleReservedOccupancy(tableId: string, currentStatus: string, tableCode: string) {
+    const newStatus = currentStatus === 'OCCUPIED' ? 'RESERVED' : 'OCCUPIED'
+    try {
+      const res = await fetch(`/api/admin/tables/${tableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to update status'); return }
+      toast.success(`${tableCode} marked as ${newStatus === 'OCCUPIED' ? 'Occupied by Representative' : 'Reserved (Vacant)'}`)
+      await fetchAll()
+    } catch { toast.error('Network error') }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen flex flex-col bg-[#101010] text-white">
@@ -330,7 +368,7 @@ export default function AdminDashboard() {
                     key={table.id}
                     className="rounded-2xl border border-white/10 bg-[#161616] p-4 space-y-3.5 hover:border-white/20 transition-all shadow-md"
                   >
-                    {/* Header: Table Code, Name, and Status Badge */}
+                    {/* Header: Table Code, Name, Role Badge, and Status Badge */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-baseline gap-2">
                         <span className="font-mono font-black text-white text-lg tracking-tight">
@@ -340,14 +378,21 @@ export default function AdminDashboard() {
                           {table.name}
                         </span>
                       </div>
-                      <span className={`text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold tracking-wider border ${
-                        table.status === 'AVAILABLE' ? 'bg-[#6BFFC5]/10 text-[#6BFFC5] border-[#6BFFC5]/30' :
-                        table.status === 'OCCUPIED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
-                        table.status === 'RESERVED' ? 'bg-[#6321FB]/20 text-[#c4b5fd] border-[#6321FB]/40' :
-                        'bg-zinc-800 text-zinc-400 border-zinc-700'
-                      }`}>
-                        {table.status}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {table.tableType === 'RESERVED' && (
+                          <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-bold tracking-wider bg-[#6321FB]/30 border border-[#6321FB]/60 text-[#c4b5fd]">
+                            Rep Seat
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold tracking-wider border ${
+                          table.status === 'AVAILABLE' ? 'bg-[#6BFFC5]/10 text-[#6BFFC5] border-[#6BFFC5]/30' :
+                          table.status === 'OCCUPIED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
+                          table.status === 'RESERVED' ? 'bg-[#6321FB]/20 text-[#c4b5fd] border-[#6321FB]/40' :
+                          'bg-zinc-800 text-zinc-400 border-zinc-700'
+                        }`}>
+                          {table.status}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Active Occupant Info */}
@@ -368,6 +413,49 @@ export default function AdminDashboard() {
                       <div className="text-xs bg-amber-500/10 border border-amber-500/20 text-amber-200 p-2.5 rounded-xl font-mono">
                         <span className="text-amber-400/80">Pending Request: </span>
                         <strong>{pendingReq.user.name}</strong>
+                      </div>
+                    )}
+
+                    {/* Representative Reserved Seat Controls */}
+                    {table.tableType === 'RESERVED' && (
+                      <div className="rounded-xl bg-[#6321FB]/15 border border-[#6321FB]/30 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono font-bold text-[#c4b5fd] flex items-center gap-1.5">
+                            <Lock className="w-3.5 h-3.5 text-[#6BFFC5]" /> Representative Reserved Seat
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReservation(table.id, table.tableType, table.tableCode)}
+                            className="text-[10px] font-mono text-zinc-400 hover:text-white underline transition-colors"
+                            title="Release this seat so regular students can claim it"
+                          >
+                            Make Regular Table
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReservedOccupancy(table.id, table.status, table.tableCode)}
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-mono font-bold border transition-all ${
+                              table.status === 'OCCUPIED'
+                                ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
+                                : 'bg-[#6321FB]/30 border-[#6321FB]/50 text-white hover:bg-[#6321FB]/50'
+                            }`}
+                          >
+                            {table.status === 'OCCUPIED' ? (
+                              <>
+                                <UserCheck className="w-3.5 h-3.5 text-rose-300" />
+                                <span>Mark Vacant (Reserved)</span>
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="w-3.5 h-3.5 text-[#6BFFC5]" />
+                                <span>Mark Rep Seated (Occupied)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -412,31 +500,42 @@ export default function AdminDashboard() {
 
                     {/* Actions footer */}
                     {table.tableType === 'REGULAR' && (
-                      <div className="flex items-center justify-end gap-2 pt-1 border-t border-white/5">
-                        {activeSession && (
-                          <button
-                            onClick={() => handleReleaseTable(table.id, table.name)}
-                            className="inline-flex items-center gap-1 text-[11px] font-mono text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 px-2.5 py-1 rounded-lg transition-all"
-                          >
-                            <LogOut className="w-3 h-3" /> Force Release
-                          </button>
-                        )}
-                        {table.status !== 'MAINTENANCE' && !activeSession && (
-                          <button
-                            onClick={() => handleMaintenance(table.id, true, table.name)}
-                            className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 hover:bg-white/5 px-2.5 py-1 rounded-lg transition-all"
-                          >
-                            <Wrench className="w-3 h-3" /> Maintenance
-                          </button>
-                        )}
-                        {table.status === 'MAINTENANCE' && (
-                          <button
-                            onClick={() => handleMaintenance(table.id, false, table.name)}
-                            className="inline-flex items-center gap-1 text-[11px] font-mono text-[#6BFFC5] bg-[#6BFFC5]/10 border border-[#6BFFC5]/30 hover:bg-[#6BFFC5]/20 px-2.5 py-1 rounded-lg transition-all font-semibold"
-                          >
-                            <CheckCircle2 className="w-3 h-3" /> Restore Table
-                          </button>
-                        )}
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/5">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleReservation(table.id, table.tableType, table.tableCode)}
+                          className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-[#c4b5fd] hover:bg-[#6321FB]/10 border border-transparent hover:border-[#6321FB]/30 px-2 py-1 rounded-lg transition-all"
+                          title="Reserve this table permanently for Representatives"
+                        >
+                          <Lock className="w-3 h-3 text-[#6321FB]" /> Reserve Table
+                        </button>
+
+                        <div className="flex items-center gap-1.5">
+                          {activeSession && (
+                            <button
+                              onClick={() => handleReleaseTable(table.id, table.name)}
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 px-2.5 py-1 rounded-lg transition-all"
+                            >
+                              <LogOut className="w-3 h-3" /> Force Release
+                            </button>
+                          )}
+                          {table.status !== 'MAINTENANCE' && !activeSession && (
+                            <button
+                              onClick={() => handleMaintenance(table.id, true, table.name)}
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 hover:bg-white/5 px-2.5 py-1 rounded-lg transition-all"
+                            >
+                              <Wrench className="w-3 h-3" /> Maintenance
+                            </button>
+                          )}
+                          {table.status === 'MAINTENANCE' && (
+                            <button
+                              onClick={() => handleMaintenance(table.id, false, table.name)}
+                              className="inline-flex items-center gap-1 text-[11px] font-mono text-[#6BFFC5] bg-[#6BFFC5]/10 border border-[#6BFFC5]/30 hover:bg-[#6BFFC5]/20 px-2.5 py-1 rounded-lg transition-all font-semibold"
+                            >
+                              <CheckCircle2 className="w-3 h-3" /> Restore Table
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

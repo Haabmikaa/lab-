@@ -1,6 +1,6 @@
 // lib/validations.ts — Zod schemas for all API inputs
 import { z } from 'zod'
-import { ConnectionType, Role } from '@prisma/client'
+import { ConnectionType, Role, TableType, TableStatus } from '@prisma/client'
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -76,8 +76,10 @@ export const releaseSessionSchema = z.object({
 
 export const updateTableSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  description: z.string().max(500).optional(),
+  description: z.string().max(500).optional().nullable(),
   hasEthernet: z.boolean().optional(),
+  tableType: z.nativeEnum(TableType).optional(),
+  status: z.nativeEnum(TableStatus).optional(),
 })
 
 export const tableMaintenanceSchema = z.object({

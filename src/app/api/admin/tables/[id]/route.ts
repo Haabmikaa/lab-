@@ -36,9 +36,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       if (!parsed.success)
         return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 422 })
 
+      const updateData = { ...parsed.data }
+      if (updateData.tableType === 'RESERVED' && !updateData.status) {
+        updateData.status = TableStatus.RESERVED
+      } else if (updateData.tableType === 'REGULAR' && !updateData.status) {
+        updateData.status = TableStatus.AVAILABLE
+      }
+
       const table = await prisma.labTable.update({
         where: { id },
-        data: parsed.data,
+        data: updateData,
       })
 
       await auditLog({
@@ -46,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         action: AuditAction.TABLE_UPDATED,
         entityType: 'LabTable',
         entityId: id,
-        metadata: parsed.data,
+        metadata: updateData,
       })
 
       invalidateTablesCache()
