@@ -26,6 +26,8 @@ export async function GET(_req: NextRequest) {
       { id: 's2', key: 'session_inactivity_timeout_minutes', value: '120', description: 'Auto-release table after inactivity', updatedAt: new Date().toISOString() },
       { id: 's3', key: 'approval_expiry_minutes', value: '30', description: 'Minutes before approval expires', updatedAt: new Date().toISOString() },
       { id: 's4', key: 'lab_name', value: 'University Computer Laboratory', description: 'Display name', updatedAt: new Date().toISOString() },
+      { id: 's5', key: 'ethernet_verification_enabled', value: 'true', description: 'Enable automatic direct occupancy on verified university Ethernet', updatedAt: new Date().toISOString() },
+      { id: 's6', key: 'trusted_ethernet_ips', value: '102.213.68.*, 10.240.72.1-10.240.72.225, 10.10.*, 172.24.*, 127.0.0.1, ::1, localhost', description: 'Lab Ethernet verified IP range (10.240.72.1 to 10.240.72.225)', updatedAt: new Date().toISOString() },
     ]
     return NextResponse.json({ settings: defaultSettings })
   }

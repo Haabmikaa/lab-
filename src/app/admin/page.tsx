@@ -291,11 +291,10 @@ export default function AdminDashboard() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
-                activeTab === tab
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab
                   ? 'bg-[#6321FB] text-white shadow-md shadow-[#6321FB]/30'
                   : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
-              }`}
+                }`}
             >
               {tab}
               {tab === 'requests' && pendingRequests.length > 0 && (
@@ -407,12 +406,11 @@ export default function AdminDashboard() {
                             Rep Seat
                           </span>
                         )}
-                        <span className={`text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold tracking-wider border ${
-                          table.status === 'AVAILABLE' ? 'bg-[#6BFFC5]/10 text-[#6BFFC5] border-[#6BFFC5]/30' :
-                          table.status === 'OCCUPIED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
-                          table.status === 'RESERVED' ? 'bg-[#6321FB]/20 text-[#c4b5fd] border-[#6321FB]/40' :
-                          'bg-zinc-800 text-zinc-400 border-zinc-700'
-                        }`}>
+                        <span className={`text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold tracking-wider border ${table.status === 'AVAILABLE' ? 'bg-[#6BFFC5]/10 text-[#6BFFC5] border-[#6BFFC5]/30' :
+                            table.status === 'OCCUPIED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
+                              table.status === 'RESERVED' ? 'bg-[#6321FB]/20 text-[#c4b5fd] border-[#6321FB]/40' :
+                                'bg-zinc-800 text-zinc-400 border-zinc-700'
+                          }`}>
                           {table.status}
                         </span>
                       </div>
@@ -460,11 +458,10 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={() => handleToggleReservedOccupancy(table.id, table.status, table.tableCode)}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-mono font-bold border transition-all ${
-                              table.status === 'OCCUPIED'
+                            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-mono font-bold border transition-all ${table.status === 'OCCUPIED'
                                 ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
                                 : 'bg-[#6321FB]/30 border-[#6321FB]/50 text-white hover:bg-[#6321FB]/50'
-                            }`}
+                              }`}
                           >
                             {table.status === 'OCCUPIED' ? (
                               <>
@@ -495,11 +492,10 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={() => !table.hasEthernet && handleToggleEthernet(table.id, false, table.tableCode)}
-                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold font-mono transition-all ${
-                              table.hasEthernet
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold font-mono transition-all ${table.hasEthernet
                                 ? 'bg-[#6BFFC5] text-[#101010] shadow-md shadow-[#6BFFC5]/20 font-bold'
                                 : 'text-zinc-400 hover:text-white hover:bg-white/5 cursor-pointer'
-                            }`}
+                              }`}
                           >
                             <Cable className="w-3.5 h-3.5" />
                             <span>Ethernet</span>
@@ -508,11 +504,10 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={() => table.hasEthernet && handleToggleEthernet(table.id, true, table.tableCode)}
-                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold font-mono transition-all ${
-                              !table.hasEthernet
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold font-mono transition-all ${!table.hasEthernet
                                 ? 'bg-amber-400 text-[#101010] shadow-md shadow-amber-400/20 font-bold'
                                 : 'text-zinc-400 hover:text-white hover:bg-white/5 cursor-pointer'
-                            }`}
+                              }`}
                           >
                             <Wifi className="w-3.5 h-3.5" />
                             <span>Hotspot</span>
@@ -693,26 +688,23 @@ function AdminUsersPanel() {
                 <td className="py-3 px-3 font-semibold text-white">{u.name}</td>
                 <td className="py-3 px-3 text-zinc-400 font-mono">{u.email}</td>
                 <td className="py-3 px-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                    u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
-                  }`}>{u.role}</span>
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
+                    }`}>{u.role}</span>
                 </td>
                 <td className="py-3 px-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                    u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
-                    u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
-                    'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  }`}>{u.accountStatus}</span>
+                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
+                      u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
+                        'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    }`}>{u.accountStatus}</span>
                 </td>
                 <td className="py-3 px-3 text-right">
                   {u.role !== 'ADMIN' && (
                     <button
                       onClick={() => handleToggleStatus(u.id, u.accountStatus, u.name)}
-                      className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${
-                        u.accountStatus === 'ACTIVE'
+                      className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${u.accountStatus === 'ACTIVE'
                           ? 'border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white'
                           : 'border border-[#6BFFC5]/40 text-[#6BFFC5] hover:bg-[#6BFFC5] hover:text-[#101010]'
-                      }`}
+                        }`}
                     >
                       {u.accountStatus === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
                     </button>
@@ -843,22 +835,39 @@ function AdminSettingsPanel() {
 
       <div className="divide-y divide-white/5">
         {settings.map((s) => (
-          <div key={s.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-0.5 max-w-md">
-              <div className="font-mono text-xs font-bold text-[#c4b5fd]">{s.key}</div>
-              <div className="text-xs text-zinc-400">{s.description || 'Configurable policy'}</div>
+          <div key={s.id} className="py-4 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div className="space-y-1 max-w-sm">
+              <div className="font-mono text-xs font-bold text-[#c4b5fd] flex items-center gap-2">
+                {s.key}
+                {s.key === 'trusted_ethernet_ips' && (
+                  <span className="text-[10px] font-mono uppercase bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/30 px-2 py-0.5 rounded-full">
+                    Active IP Policy
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-zinc-400 leading-relaxed">{s.description || 'Configurable policy'}</div>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={editValues[s.key] ?? s.value}
-                onChange={(e) => setEditValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
-                className="w-48 rounded-xl bg-black/60 border border-white/15 px-3 py-2 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
-              />
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+              {s.key === 'trusted_ethernet_ips' ? (
+                <textarea
+                  rows={2}
+                  value={editValues[s.key] ?? s.value}
+                  onChange={(e) => setEditValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
+                  placeholder="e.g. 10.240.72.1-10.240.72.225, 102.213.68.*, 127.0.0.1"
+                  className="w-full lg:w-[420px] rounded-xl bg-black/60 border border-white/15 px-3 py-2 text-xs text-[#6BFFC5] font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB] resize-none"
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={editValues[s.key] ?? s.value}
+                  onChange={(e) => setEditValues((prev) => ({ ...prev, [s.key]: e.target.value }))}
+                  className="w-full sm:w-64 rounded-xl bg-black/60 border border-white/15 px-3 py-2 text-xs text-white font-mono outline-none focus:border-[#6321FB] focus:ring-1 focus:ring-[#6321FB]"
+                />
+              )}
               <button
                 onClick={() => handleSave(s.key)}
                 disabled={savingKey === s.key || editValues[s.key] === s.value}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] px-3.5 py-2 text-xs font-bold uppercase tracking-wider hover:bg-[#5ae6af] disabled:opacity-40 transition-all shadow-sm shadow-[#6BFFC5]/20"
+                className="self-end sm:self-auto inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] px-4 py-2 text-xs font-bold uppercase tracking-wider hover:bg-[#5ae6af] disabled:opacity-40 transition-all shadow-sm shadow-[#6BFFC5]/20 shrink-0"
               >
                 {savingKey === s.key ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#101010]" /> : <Save className="w-3.5 h-3.5" />}
                 Save
