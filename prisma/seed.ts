@@ -116,8 +116,13 @@ async function main() {
     },
     {
       key: 'ethernet_verification_enabled',
-      value: 'false',
+      value: 'true',
       description: 'Whether university IT Ethernet verification is integrated',
+    },
+    {
+      key: 'trusted_ethernet_ips',
+      value: '10.240.72.1-10.240.72.225, 127.0.0.1, ::1, localhost',
+      description: 'Lab Ethernet verified IP range (10.240.72.1 to 10.240.72.225)',
     },
   ]
 
