@@ -15,28 +15,55 @@ export async function GET(req: NextRequest) {
   if (error) return error
 
   const { searchParams } = new URL(req.url)
-  const parsed = paginationSchema.safeParse({ page: searchParams.get('page'), limit: searchParams.get('limit') })
-  const { page, limit } = parsed.success ? parsed.data : { page: 1, limit: 20 }
+  const pageParam = parseInt(searchParams.get('page') || '1', 10)
+  const limitParam = parseInt(searchParams.get('limit') || '100', 10)
+  const page = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam
+  const limit = isNaN(limitParam) || limitParam < 1 ? 100 : Math.min(limitParam, 500)
 
   try {
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        select: {
-          id: true, name: true, email: true, role: true, accountStatus: true,
-          emailVerifiedAt: true, createdAt: true, updatedAt: true,
-          _count: { select: { sessions: true, requests: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.user.count(),
-    ])
+    let users, total
+    try {
+      ;[users, total] = await Promise.all([
+        prisma.user.findMany({
+          select: {
+            id: true, name: true, email: true, role: true, accountStatus: true,
+            emailVerifiedAt: true, createdAt: true, updatedAt: true,
+            _count: { select: { sessions: true, requests: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.user.count(),
+      ])
+    } catch {
+      // Small pause and 1 retry for serverless DB reconnection
+      await new Promise((r) => setTimeout(r, 200))
+      ;[users, total] = await Promise.all([
+        prisma.user.findMany({
+          select: {
+            id: true, name: true, email: true, role: true, accountStatus: true,
+            emailVerifiedAt: true, createdAt: true, updatedAt: true,
+            _count: { select: { sessions: true, requests: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.user.count(),
+      ])
+    }
 
-    return NextResponse.json({ users, total, page, limit })
+    return NextResponse.json(
+      { users, total, page, limit },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    )
   } catch (err) {
-    console.warn('[GET /api/admin/users] Database query error:', (err as Error).message)
-    return NextResponse.json({ users: [], total: 0, page: 1, limit: 20 })
+    console.error('[GET /api/admin/users] Database query error:', err)
+    return NextResponse.json(
+      { error: (err as Error).message, users: [], total: 0, page, limit },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } }
+    )
   }
 }
 

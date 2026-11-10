@@ -90,7 +90,7 @@ export const tableMaintenanceSchema = z.object({
 // ── System settings ───────────────────────────────────────────────────────────
 
 export const updateSettingSchema = z.object({
-  value: z.string().min(1).max(1000),
+  value: z.string().max(5000),
 })
 
 // ── Pagination ────────────────────────────────────────────────────────────────

@@ -104,9 +104,10 @@ export async function verifyClientNetwork(
       return { connectionType: ConnectionType.UNVERIFIED, clientIp, isVerifiedEthernet: false }
     }
 
-    const defaultPatterns = '10.10.*, 192.168.*, 127.0.0.1, ::1, localhost'
-    const trustedPatterns = (trustedIpsSetting?.value || defaultPatterns)
-      .split(',')
+    const defaultPatterns = '102.213.68.*, 10.240.72.1-10.240.72.225, 10.10.*, 172.24.*, 192.168.*, 127.0.0.1, ::1, localhost'
+    const rawSetting = trustedIpsSetting?.value?.trim() || defaultPatterns
+    const trustedPatterns = rawSetting
+      .split(/[\r\n,;]+/)
       .map((s) => s.trim())
       .filter(Boolean)
 

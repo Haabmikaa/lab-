@@ -45,23 +45,29 @@ export async function GET(req: NextRequest) {
       prisma.auditLog.count({ where }),
     ])
 
-    return NextResponse.json({ logs, total, page, limit })
+    return NextResponse.json(
+      { logs, total, page, limit },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    )
   } catch (err) {
     console.warn('[GET /api/audit] Database offline or unmigrated, returning empty audit list:', (err as Error).message)
-    return NextResponse.json({
-      logs: [
-        {
-          id: 'initial-setup-log',
-          action: 'SYSTEM_STARTUP',
-          entityType: 'System',
-          createdAt: new Date().toISOString(),
-          actor: { name: 'System', email: 'system@university.edu', role: 'ADMIN' },
-        },
-      ],
-      total: 1,
-      page: 1,
-      limit: 20,
-    })
+    return NextResponse.json(
+      {
+        logs: [
+          {
+            id: 'initial-setup-log',
+            action: 'SYSTEM_STARTUP',
+            entityType: 'System',
+            createdAt: new Date().toISOString(),
+            actor: { name: 'System', email: 'system@university.edu', role: 'ADMIN' },
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 20,
+      },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    )
   }
 }
 

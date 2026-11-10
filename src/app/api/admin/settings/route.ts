@@ -18,7 +18,10 @@ export async function GET(_req: NextRequest) {
         updatedByUser: { select: { id: true, name: true, email: true } },
       },
     })
-    return NextResponse.json({ settings })
+    return NextResponse.json(
+      { settings },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    )
   } catch (err) {
     console.warn('[GET /api/admin/settings] Database offline or unmigrated, returning default settings:', (err as Error).message)
     const defaultSettings = [
@@ -29,7 +32,10 @@ export async function GET(_req: NextRequest) {
       { id: 's5', key: 'ethernet_verification_enabled', value: 'true', description: 'Enable automatic direct occupancy on verified university Ethernet', updatedAt: new Date().toISOString() },
       { id: 's6', key: 'trusted_ethernet_ips', value: '102.213.68.*, 10.240.72.1-10.240.72.225, 10.10.*, 172.24.*, 127.0.0.1, ::1, localhost', description: 'Lab Ethernet verified IP range (10.240.72.1 to 10.240.72.225)', updatedAt: new Date().toISOString() },
     ]
-    return NextResponse.json({ settings: defaultSettings })
+    return NextResponse.json(
+      { settings: defaultSettings },
+      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+    )
   }
 }
 

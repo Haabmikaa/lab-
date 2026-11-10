@@ -734,21 +734,48 @@ function AdminUsersPanel() {
   const { data: session } = useSession()
   const [users, setUsers] = useState<unknown[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [passwordModalUser, setPasswordModalUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [newPasswordValue, setNewPasswordValue] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
 
-  const loadUsers = useCallback(() => {
-    fetch('/api/admin/users')
-      .then((r) => r.json())
-      .then((d) => setUsers(d.users ?? []))
-      .catch(() => toast.error('Failed to load accounts'))
-      .finally(() => setLoading(false))
+  const loadUsers = useCallback(async (isInitial = false) => {
+    try {
+      const res = await fetch('/api/admin/users?limit=100', { cache: 'no-store' })
+      const data = await res.json()
+      if (data.users) {
+        setUsers(data.users)
+      }
+    } catch {
+      if (isInitial) toast.error('Failed to load accounts')
+    } finally {
+      if (isInitial) setLoading(false)
+      setRefreshing(false)
+    }
   }, [])
 
   useEffect(() => {
-    loadUsers()
+    loadUsers(true)
+
+    // Instant real-time background sync every 3 seconds
+    const interval = setInterval(() => {
+      loadUsers(false)
+    }, 3000)
+
+    const handleFocus = () => loadUsers(false)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadUsers(false)
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [loadUsers])
 
   async function handleToggleStatus(userId: string, currentStatus: string, name: string) {
@@ -814,6 +841,7 @@ function AdminUsersPanel() {
       toast.success(data.message ?? 'Password updated successfully')
       setPasswordModalUser(null)
       setNewPasswordValue('')
+      loadUsers()
     } catch {
       toast.error('Network error changing password')
     } finally {
@@ -825,97 +853,126 @@ function AdminUsersPanel() {
 
   return (
     <div className="bg-[#141414] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5 relative">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
           <Users className="w-4 h-4 text-[#6BFFC5]" aria-hidden="true" />
-          Authorized User Accounts
+          Authorized User Accounts {users.length > 0 && <span className="text-[#6BFFC5]">({users.length})</span>}
         </h2>
-        <Link
-          href="/admin/users/new"
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] font-bold px-4 py-2 text-xs hover:bg-[#5ae6af] uppercase tracking-wider shadow-md shadow-[#6BFFC5]/20"
-        >
-          <UserPlus className="w-3.5 h-3.5" />
-          Authorize User
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setRefreshing(true); loadUsers(false) }}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs font-mono font-bold text-zinc-300 hover:text-white transition-all disabled:opacity-50"
+            title="Instantly refetch user accounts"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#6BFFC5] ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+          <Link
+            href="/admin/users/new"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#6BFFC5] text-[#101010] font-bold px-4 py-2 text-xs hover:bg-[#5ae6af] uppercase tracking-wider shadow-md shadow-[#6BFFC5]/20"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            Authorize User
+          </Link>
+        </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-white/10 text-zinc-400 font-mono uppercase">
-              <th className="text-left py-3 px-3">Name</th>
-              <th className="text-left py-3 px-3">Email</th>
-              <th className="text-left py-3 px-3">Role</th>
-              <th className="text-left py-3 px-3">Status</th>
-              <th className="text-right py-3 px-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {(users as Array<{ id: string; name: string; email: string; role: string; accountStatus: string }>).map((u) => {
-              const isSelf = u.id === session?.user?.id
-              return (
-                <tr key={u.id} className="hover:bg-white/5 transition-colors">
-                  <td className="py-3 px-3 font-semibold text-white">
-                    {u.name} {isSelf && <span className="ml-1 text-[10px] font-mono text-zinc-400">(You)</span>}
-                  </td>
-                  <td className="py-3 px-3 text-zinc-400 font-mono">{u.email}</td>
-                  <td className="py-3 px-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                      u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
-                    }`}>{u.role}</span>
-                  </td>
-                  <td className="py-3 px-3">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                      u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
-                      u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
-                      'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                    }`}>{u.accountStatus}</span>
-                  </td>
-                  <td className="py-3 px-3 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* Password reset button */}
-                      <button
-                        onClick={() => { setPasswordModalUser(u); setNewPasswordValue('') }}
-                        title="Change user password"
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-[#6321FB]/20 border border-[#6321FB]/40 text-[#c4b5fd] hover:bg-[#6321FB] hover:text-white transition-all"
-                      >
-                        <KeyRound className="w-3 h-3" />
-                        Password
-                      </button>
 
-                      {/* Deactivate/Reactivate button */}
-                      {!isSelf && u.role !== 'ADMIN' && (
+      {users.length === 0 ? (
+        <div className="text-center py-16 text-zinc-400 space-y-4 font-mono border border-dashed border-white/10 rounded-2xl p-6 bg-black/20">
+          <Users className="w-10 h-10 mx-auto text-zinc-600" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">No user accounts found</p>
+            <p className="text-xs text-zinc-500">Checking database connection or no accounts match query.</p>
+          </div>
+          <button
+            onClick={() => { setRefreshing(true); loadUsers(true) }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs text-white font-mono transition-all"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-[#6BFFC5] ${refreshing ? 'animate-spin' : ''}`} />
+            Retry Loading Users
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/10 text-zinc-400 font-mono uppercase">
+                <th className="text-left py-3 px-3">Name</th>
+                <th className="text-left py-3 px-3">Email</th>
+                <th className="text-left py-3 px-3">Role</th>
+                <th className="text-left py-3 px-3">Status</th>
+                <th className="text-right py-3 px-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {(users as Array<{ id: string; name: string; email: string; role: string; accountStatus: string }>).map((u) => {
+                const isSelf = u.id === session?.user?.id
+                return (
+                  <tr key={u.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-3 font-semibold text-white">
+                      {u.name} {isSelf && <span className="ml-1 text-[10px] font-mono text-zinc-400">(You)</span>}
+                    </td>
+                    <td className="py-3 px-3 text-zinc-400 font-mono">{u.email}</td>
+                    <td className="py-3 px-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
+                        u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
+                      }`}>{u.role}</span>
+                    </td>
+                    <td className="py-3 px-3">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
+                        u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
+                        u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
+                        'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      }`}>{u.accountStatus}</span>
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Password reset button */}
                         <button
-                          onClick={() => handleToggleStatus(u.id, u.accountStatus, u.name)}
-                          className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${
-                            u.accountStatus === 'ACTIVE'
-                              ? 'border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black'
-                              : 'border border-[#6BFFC5]/40 text-[#6BFFC5] hover:bg-[#6BFFC5] hover:text-[#101010]'
-                          }`}
+                          onClick={() => { setPasswordModalUser(u); setNewPasswordValue('') }}
+                          title="Change user password"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-[#6321FB]/20 border border-[#6321FB]/40 text-[#c4b5fd] hover:bg-[#6321FB] hover:text-white transition-all"
                         >
-                          {u.accountStatus === 'ACTIVE' ? 'Disable' : 'Enable'}
+                          <KeyRound className="w-3 h-3" />
+                          Password
                         </button>
-                      )}
 
-                      {/* Delete user button */}
-                      {!isSelf && (
-                        <button
-                          onClick={() => handleDeleteUser(u.id, u.name, u.email)}
-                          disabled={deletingUserId === u.id}
-                          title="Permanently delete user"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white transition-all disabled:opacity-50"
-                        >
-                          {deletingUserId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                        {/* Deactivate/Reactivate button */}
+                        {!isSelf && u.role !== 'ADMIN' && (
+                          <button
+                            onClick={() => handleToggleStatus(u.id, u.accountStatus, u.name)}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${
+                              u.accountStatus === 'ACTIVE'
+                                ? 'border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black'
+                                : 'border border-[#6BFFC5]/40 text-[#6BFFC5] hover:bg-[#6BFFC5] hover:text-[#101010]'
+                            }`}
+                          >
+                            {u.accountStatus === 'ACTIVE' ? 'Disable' : 'Enable'}
+                          </button>
+                        )}
+
+                        {/* Delete user button */}
+                        {!isSelf && (
+                          <button
+                            onClick={() => handleDeleteUser(u.id, u.name, u.email)}
+                            disabled={deletingUserId === u.id}
+                            title="Permanently delete user"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white transition-all disabled:opacity-50"
+                          >
+                            {deletingUserId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Change Password Modal */}
       {passwordModalUser && (
@@ -976,38 +1033,87 @@ function AdminUsersPanel() {
 function AdminAuditPanel() {
   const [logs, setLogs] = useState<unknown[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadAudit = useCallback(async (isInitial = false) => {
+    try {
+      const res = await fetch('/api/audit?limit=50', { cache: 'no-store' })
+      const data = await res.json()
+      if (data.logs) {
+        setLogs(data.logs)
+      }
+    } catch {
+      if (isInitial) toast.error('Failed to load audit records')
+    } finally {
+      if (isInitial) setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
 
   useEffect(() => {
-    fetch('/api/audit?limit=50')
-      .then((r) => r.json())
-      .then((d) => setLogs(d.logs ?? []))
-      .catch(() => toast.error('Failed to load audit records'))
-      .finally(() => setLoading(false))
-  }, [])
+    loadAudit(true)
+
+    const interval = setInterval(() => {
+      loadAudit(false)
+    }, 3000)
+
+    const handleFocus = () => loadAudit(false)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadAudit(false)
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [loadAudit])
 
   if (loading) return <div className="animate-pulse h-48 bg-white/5 rounded-3xl" />
 
   return (
     <div className="bg-[#141414] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-4">
-      <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider">
-        Audit Log (Recent 50 Events)
-      </h2>
-      <div className="divide-y divide-white/5">
-        {(logs as Array<{ id: string; action: string; createdAt: string; actor?: { name: string; email: string } | null; entityType?: string; entityId?: string }>).map((log) => (
-          <div key={log.id} className="py-2.5 flex items-start justify-between gap-4 text-xs">
-            <div className="min-w-0 flex-1">
-              <span className="font-mono font-bold text-[#6BFFC5]">{log.action}</span>
-              {log.actor && (
-                <span className="ml-2 text-zinc-300 font-mono">by {log.actor.name}</span>
-              )}
-              {log.entityType && (
-                <span className="ml-2 text-zinc-500 font-mono">[{log.entityType}]</span>
-              )}
-            </div>
-            <span className="shrink-0 text-[11px] font-mono text-zinc-500">{formatRelativeTime(log.createdAt)}</span>
-          </div>
-        ))}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+          <Clock className="w-4 h-4 text-[#6BFFC5]" />
+          Audit Log (Recent 50 Events)
+        </h2>
+        <button
+          onClick={() => { setRefreshing(true); loadAudit(false) }}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs font-mono font-bold text-zinc-300 hover:text-white transition-all disabled:opacity-50"
+          title="Instantly refetch audit log"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-[#6BFFC5] ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
+
+      {logs.length === 0 ? (
+        <div className="text-center py-12 text-zinc-500 font-mono text-xs">
+          No audit records found.
+        </div>
+      ) : (
+        <div className="divide-y divide-white/5">
+          {(logs as Array<{ id: string; action: string; createdAt: string; actor?: { name: string; email: string } | null; entityType?: string; entityId?: string }>).map((log) => (
+            <div key={log.id} className="py-2.5 flex items-start justify-between gap-4 text-xs">
+              <div className="min-w-0 flex-1">
+                <span className="font-mono font-bold text-[#6BFFC5]">{log.action}</span>
+                {log.actor && (
+                  <span className="ml-2 text-zinc-300 font-mono">by {log.actor.name}</span>
+                )}
+                {log.entityType && (
+                  <span className="ml-2 text-zinc-500 font-mono">[{log.entityType}]</span>
+                )}
+              </div>
+              <span className="shrink-0 text-[11px] font-mono text-zinc-500">{formatRelativeTime(log.createdAt)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1023,30 +1129,36 @@ type SettingItem = {
 function AdminSettingsPanel() {
   const [settings, setSettings] = useState<SettingItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<Record<string, string>>({})
 
-  const fetchSettings = useCallback(async () => {
+  const fetchSettings = useCallback(async (isInitial = false) => {
     try {
-      const res = await fetch('/api/admin/settings')
+      const res = await fetch('/api/admin/settings', { cache: 'no-store' })
       const data = await res.json()
       if (data.settings) {
         setSettings(data.settings)
-        const initial: Record<string, string> = {}
-        data.settings.forEach((s: SettingItem) => {
-          initial[s.key] = s.value
+        setEditValues((prev) => {
+          const updated = { ...prev }
+          data.settings.forEach((s: SettingItem) => {
+            if (updated[s.key] === undefined) {
+              updated[s.key] = s.value
+            }
+          })
+          return updated
         })
-        setEditValues(initial)
       }
     } catch {
-      toast.error('Failed to load system settings')
+      if (isInitial) toast.error('Failed to load system settings')
     } finally {
-      setLoading(false)
+      if (isInitial) setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchSettings()
+    fetchSettings(true)
   }, [fetchSettings])
 
   async function handleSave(key: string) {
@@ -1065,7 +1177,7 @@ function AdminSettingsPanel() {
         return
       }
       toast.success(`Updated ${key}`)
-      await fetchSettings()
+      await fetchSettings(false)
     } catch {
       toast.error('Network error updating setting')
     } finally {
@@ -1077,14 +1189,25 @@ function AdminSettingsPanel() {
 
   return (
     <div className="bg-[#141414] border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
-          <Settings className="w-4 h-4 text-[#6BFFC5]" />
-          Configurable Lab Policies
-        </h2>
-        <p className="text-xs text-zinc-400">
-          Adjust session durations, inactivity timeouts, and approval policies. Changes take effect immediately.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+            <Settings className="w-4 h-4 text-[#6BFFC5]" />
+            Configurable Lab Policies
+          </h2>
+          <p className="text-xs text-zinc-400">
+            Adjust session durations, inactivity timeouts, and approval policies. Changes take effect immediately.
+          </p>
+        </div>
+        <button
+          onClick={() => { setRefreshing(true); fetchSettings(false) }}
+          disabled={refreshing}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-2 text-xs font-mono font-bold text-zinc-300 hover:text-white transition-all disabled:opacity-50 self-start sm:self-auto"
+          title="Instantly refetch policies"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-[#6BFFC5] ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       <div className="divide-y divide-white/5">
