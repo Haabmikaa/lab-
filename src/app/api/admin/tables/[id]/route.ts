@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { updateTableSchema, tableMaintenanceSchema } from '@/lib/validations'
 import { TableStatus, SessionStatus } from '@prisma/client'
 import { auditLog, AuditAction } from '@/lib/audit'
-import { releaseTable, OccupancyError } from '@/lib/occupancy'
+import { releaseTable, forceRevokeTable, OccupancyError } from '@/lib/occupancy'
 import { sseEmit } from '@/lib/sse'
 import { invalidateTablesCache } from '@/app/api/tables/route'
 
@@ -118,6 +118,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       })
 
       return NextResponse.json({ success: true })
+    }
+
+    // Admin force-revoke: ends any session, cancels any pending/approved request, resets to AVAILABLE
+    if (action === 'force_revoke') {
+      await forceRevokeTable({ tableId: id, adminId: session!.user.id })
+      invalidateTablesCache()
+      return NextResponse.json({ success: true, message: 'Table forcefully reset to available' })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

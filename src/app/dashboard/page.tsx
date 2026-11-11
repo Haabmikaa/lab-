@@ -52,7 +52,6 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [releasing, setReleasing] = useState(false)
-  const [activating, setActivating] = useState(false)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -140,9 +139,6 @@ export default function StudentDashboard() {
   const sseStatus = useTableSSE(useCallback((_type: string) => { fetchAll(false) }, [fetchAll]))
 
   const activePendingRequest = myRequests.find((r) => r.status === 'PENDING_APPROVAL')
-  const activeApprovedRequest = myRequests.find(
-    (r) => r.status === 'APPROVED' && (!r.approval?.usedAt)
-  )
 
   async function handleRequestTable() {
     if (!selectedTable) return
@@ -171,28 +167,6 @@ export default function StudentDashboard() {
       toast.error('Network error. Please try again.')
     } finally {
       setSubmitting(false)
-    }
-  }
-
-  async function handleActivate(requestId: string) {
-    setActivating(true)
-    try {
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        toast.error(data.error ?? 'Failed to activate table')
-        return
-      }
-      toast.success('Table activated! Your session is now live.')
-      await fetchAll()
-    } catch {
-      toast.error('Network error. Please try again.')
-    } finally {
-      setActivating(false)
     }
   }
 
@@ -321,38 +295,8 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* Approved request ready for activation */}
-        {!mySession && activeApprovedRequest && (
-          <div className="rounded-3xl border-2 border-[#6321FB] bg-[#6321FB]/20 p-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[#6321FB]/20 rounded-full blur-3xl pointer-events-none" />
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-white font-extrabold text-lg">
-                  <Sparkles className="w-6 h-6 text-[#6BFFC5]" aria-hidden="true" />
-                  <span>Request Approved by Administrator!</span>
-                </div>
-                <div className="text-xs text-zinc-300">
-                  Table Allocated: <strong className="text-white">{activeApprovedRequest.table.name} ({activeApprovedRequest.table.tableCode})</strong><br />
-                  Approval valid until: <span className="font-mono text-[#6BFFC5]">{formatDateTime(activeApprovedRequest.approval?.expiresAt)}</span>
-                </div>
-                <p className="text-xs text-[#c4b5fd] font-medium pt-1">
-                  Click &quot;Activate Table&quot; to change status to OCCUPIED and claim your physical table.
-                </p>
-              </div>
-              <button
-                onClick={() => handleActivate(activeApprovedRequest.id)}
-                disabled={activating}
-                className="shrink-0 rounded-xl bg-[#6BFFC5] text-[#101010] hover:bg-[#5ae6af] px-6 py-3 text-xs font-extrabold uppercase tracking-wider transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-[#6BFFC5]/20"
-              >
-                {activating ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                Activate Table Now
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Pending Approval Screen */}
-        {!mySession && !activeApprovedRequest && activePendingRequest && (
+        {!mySession && activePendingRequest && (
           <div className="rounded-3xl border-2 border-amber-500/40 bg-amber-500/10 p-6">
             <div className="flex items-center gap-2.5 text-amber-300 font-extrabold text-base">
               <Clock className="w-5 h-5 animate-pulse text-amber-400" aria-hidden="true" />
@@ -360,13 +304,13 @@ export default function StudentDashboard() {
             </div>
             <p className="mt-2 text-xs text-zinc-300 leading-relaxed">
               You submitted a request for <strong className="text-white">{activePendingRequest.table.name} ({activePendingRequest.table.tableCode})</strong> {formatRelativeTime(activePendingRequest.submittedAt)}.<br />
-              <strong className="text-amber-300">Security enforcement:</strong> Activation remains locked until an administrator reviews and authorizes this specific table request.
+              <strong className="text-amber-300">Security enforcement:</strong> Once approved by the administrator, your table will automatically become <span className="text-[#6BFFC5] font-semibold">Occupied</span> and your session will begin without extra steps.
             </p>
           </div>
         )}
 
         {/* Table Selection */}
-        {!mySession && !activePendingRequest && !activeApprovedRequest && tableData && (
+        {!mySession && !activePendingRequest && tableData && (
           <div className="bg-[#141414] border border-white/10 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
             <div>
               <h2 className="text-lg font-bold text-white">Select an Available Table</h2>

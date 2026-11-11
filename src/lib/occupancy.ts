@@ -121,7 +121,7 @@ export async function submitOccupancyRequest({
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
-// ─── Admin: approve a request ────────────────────────────────────────────────
+// ─── Admin: approve a request (auto-creates session immediately) ──────────────
 
 export async function approveRequest({
   requestId,
@@ -145,40 +145,53 @@ export async function approveRequest({
     if (request.expiresAt && request.expiresAt < new Date())
       throw new OccupancyError('Request has expired', 'REQUEST_EXPIRED')
 
-    // Verify table still available/pending (not grabbed by another request)
+    // Verify table still available/pending
     if (
       request.table.status !== TableStatus.PENDING_APPROVAL &&
       request.table.status !== TableStatus.AVAILABLE
     )
       throw new OccupancyError('Table is no longer available', 'TABLE_NOT_AVAILABLE')
 
-    const approvalExpiry = new Date(Date.now() + (await getApprovalExpiryMs()))
+    // Check student doesn't already have an active session
+    const existingSession = await tx.occupancySession.findFirst({
+      where: { userId: request.userId, status: SessionStatus.ACTIVE },
+    })
+    if (existingSession)
+      throw new OccupancyError('Student already has an active session', 'ALREADY_OCCUPIED')
 
-    // Update request status
+    // Mark request as APPROVED
     await tx.occupancyRequest.update({
       where: { id: requestId },
-      data: {
-        status: RequestStatus.APPROVED,
-        reviewedBy: adminId,
-        reviewedAt: new Date(),
-      },
+      data: { status: RequestStatus.APPROVED, reviewedBy: adminId, reviewedAt: new Date() },
     })
 
-    // Create approval record
+    // Create approval record (already used — no waiting for student action)
     const approval = await tx.approvalRecord.create({
       data: {
         requestId,
         adminId,
         decision: ApprovalDecision.APPROVED,
         reason: reason ?? null,
-        expiresAt: approvalExpiry,
+        expiresAt: new Date(Date.now() + (await getApprovalExpiryMs())),
+        usedAt: new Date(), // Consumed immediately
       },
     })
 
-    // Update table status to APPROVED
+    // Auto-create an active occupancy session — no student action required
+    const session = await tx.occupancySession.create({
+      data: {
+        userId: request.userId,
+        tableId: request.tableId,
+        requestId: request.id,
+        connectionType: request.connectionType,
+        status: SessionStatus.ACTIVE,
+      },
+    })
+
+    // Set table to OCCUPIED immediately
     await tx.labTable.update({
       where: { id: request.tableId },
-      data: { status: TableStatus.APPROVED },
+      data: { status: TableStatus.OCCUPIED },
     })
 
     await auditLog({
@@ -186,12 +199,35 @@ export async function approveRequest({
       action: AuditAction.REQUEST_APPROVED,
       entityType: 'OccupancyRequest',
       entityId: requestId,
-      metadata: { tableId: request.tableId, tableCode: request.table.tableCode, studentId: request.userId, approvalId: approval.id },
+      metadata: {
+        tableId: request.tableId,
+        tableCode: request.table.tableCode,
+        studentId: request.userId,
+        approvalId: approval.id,
+        sessionId: session.id,
+        autoActivated: true,
+      },
     })
 
+    await auditLog({
+      actorUserId: request.userId,
+      action: AuditAction.SESSION_STARTED,
+      entityType: 'OccupancySession',
+      entityId: session.id,
+      metadata: {
+        tableId: request.tableId,
+        tableCode: request.table.tableCode,
+        requestId: request.id,
+        approvalId: approval.id,
+        connectionType: request.connectionType,
+        autoActivatedByAdmin: true,
+      },
+    })
+
+    sseEmit('table:occupied', { tableId: request.tableId, tableCode: request.table.tableCode })
     sseEmit('request:approved', { requestId, userId: request.userId, tableCode: request.table.tableCode })
 
-    return { request, approval }
+    return { request, approval, session }
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
@@ -349,7 +385,64 @@ export async function activateApprovedRequest({
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
 }
 
-// ─── Release a table ──────────────────────────────────────────────────────────
+// ─── Admin: force-revoke any table (occupied, pending, or approved) ──────────
+
+export async function forceRevokeTable({
+  tableId,
+  adminId,
+}: {
+  tableId: string
+  adminId: string
+}) {
+  return await prisma.$transaction(async (tx) => {
+    const table = await tx.labTable.findUnique({ where: { id: tableId } })
+    if (!table) throw new OccupancyError('Table not found', 'TABLE_NOT_FOUND')
+
+    // 1. End any active session on this table
+    const activeSession = await tx.occupancySession.findFirst({
+      where: { tableId, status: SessionStatus.ACTIVE },
+    })
+    if (activeSession) {
+      await tx.occupancySession.update({
+        where: { id: activeSession.id },
+        data: { status: SessionStatus.ADMINISTRATIVELY_ENDED, endedAt: new Date(), endedBy: adminId },
+      })
+    }
+
+    // 2. Cancel any pending or approved requests for this table
+    await tx.occupancyRequest.updateMany({
+      where: {
+        tableId,
+        status: { in: [RequestStatus.PENDING_APPROVAL, RequestStatus.APPROVED] },
+      },
+      data: { status: RequestStatus.CANCELLED },
+    })
+
+    // 3. Reset table to AVAILABLE
+    await tx.labTable.update({
+      where: { id: tableId },
+      data: { status: TableStatus.AVAILABLE },
+    })
+
+    await auditLog({
+      actorUserId: adminId,
+      action: AuditAction.SESSION_ADMIN_RELEASED,
+      entityType: 'LabTable',
+      entityId: tableId,
+      metadata: {
+        tableCode: table.tableCode,
+        hadActiveSession: !!activeSession,
+        sessionId: activeSession?.id,
+        forceRevoke: true,
+      },
+    })
+
+    sseEmit('table:available', { tableId, tableCode: table.tableCode })
+
+    return { table, sessionEnded: !!activeSession }
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20000, maxWait: 10000 })
+}
+
 
 export async function releaseTable({
   sessionId,

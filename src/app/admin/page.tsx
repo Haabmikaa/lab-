@@ -159,7 +159,7 @@ export default function AdminDashboard() {
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Failed to approve'); return }
-      toast.success('Request approved — student can now activate table')
+      toast.success('Request approved — table is now occupied automatically')
       await fetchAll()
     } catch { toast.error('Network error') }
     finally { setApproving(null) }
@@ -194,6 +194,21 @@ export default function AdminDashboard() {
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Failed to release'); return }
       toast.success('Table released by administrator')
+      await fetchAll()
+    } catch { toast.error('Network error') }
+  }
+
+  async function handleForceRevoke(tableId: string, tableCode: string) {
+    if (!confirm(`Force reset ${tableCode} to Available? This will end any active session and cancel all pending requests.`)) return
+    try {
+      const res = await fetch(`/api/admin/tables/${tableId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'force_revoke' }),
+      })
+      const data = await res.json()
+      if (!res.ok) { toast.error(data.error ?? 'Failed to revoke table'); return }
+      toast.success(`${tableCode} forcefully reset to Available`)
       await fetchAll()
     } catch { toast.error('Network error') }
   }
@@ -567,15 +582,17 @@ export default function AdminDashboard() {
                         </button>
 
                         <div className="flex items-center gap-1.5">
-                          {activeSession && (
+                          {/* Force Revoke: available for any table that is occupied or has a pending request */}
+                          {(table.status === 'OCCUPIED' || table.status === 'PENDING_APPROVAL' || table.status === 'APPROVED' || activeSession || pendingReq) && (
                             <button
-                              onClick={() => handleReleaseTable(table.id, table.name)}
+                              onClick={() => handleForceRevoke(table.id, table.tableCode)}
                               className="inline-flex items-center gap-1 text-[11px] font-mono text-rose-300 hover:text-rose-200 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 px-2.5 py-1 rounded-lg transition-all"
+                              title="Forcefully reset this table back to Available"
                             >
-                              <LogOut className="w-3 h-3" /> Force Release
+                              <XCircle className="w-3 h-3" /> Force Revoke
                             </button>
                           )}
-                          {table.status !== 'MAINTENANCE' && !activeSession && (
+                          {table.status !== 'MAINTENANCE' && !activeSession && !pendingReq && table.status === 'AVAILABLE' && (
                             <button
                               onClick={() => handleMaintenance(table.id, true, table.name)}
                               className="inline-flex items-center gap-1 text-[11px] font-mono text-zinc-400 hover:text-zinc-200 hover:bg-white/5 px-2.5 py-1 rounded-lg transition-all"

@@ -104,7 +104,7 @@ export async function GET() {
     }
 
     cachedData = { tables, stats, lastUpdated: new Date().toISOString() }
-    cacheExpiresAt = now + 3000 // 3 seconds TTL
+    cacheExpiresAt = now + 1000 // 1 second TTL — reduces status flicker
 
     return NextResponse.json(cachedData, {
       headers: {
