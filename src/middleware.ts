@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 
-const PUBLIC_ROUTES = ['/', '/login', '/api/tables', '/api/sse', '/api/auth']
+const PUBLIC_ROUTES = ['/', '/login', '/halo', '/api/tables', '/api/sse', '/api/auth', '/api/network-status']
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -18,15 +18,21 @@ export async function middleware(req: NextRequest) {
 
   const session = await auth()
 
-  // No session → redirect to login
+  // No session → return 401 for API, redirect to login for pages
   if (!session || !session.user) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
-  // Disabled account → redirect to login with error
+  // Disabled account → return 403 for API, redirect to login for pages
   if (session.error === 'AccountDisabled' || session.user.accountStatus === 'DISABLED') {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Account disabled' }, { status: 403 })
+    }
     const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('error', 'AccountDisabled')
     return NextResponse.redirect(loginUrl)

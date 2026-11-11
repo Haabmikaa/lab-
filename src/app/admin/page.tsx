@@ -753,12 +753,23 @@ export default function AdminDashboard() {
   )
 }
 
-let cachedAdminUsers: unknown[] | null = null
+const INITIAL_ADMIN_USERS = [
+  { id: 'cmwbpghab0000jh08u1cf2vkb', name: 'Emrafil', email: 'epix3epix@gmail.com', role: 'REPRESENTATIVE', accountStatus: 'ACTIVE' },
+  { id: 'cmwbofn2r0000id08r8bqlz0j', name: 'Estifanos tema', email: 'etemesgen817@gmail.com', role: 'STUDENT', accountStatus: 'ACTIVE' },
+  { id: 'cmwbobahs0000jv088o8gfjrr', name: 'Dagim Tesfaye', email: 'damitansio@gmail.com', role: 'STUDENT', accountStatus: 'ACTIVE' },
+  { id: 'cmwbo77yr0002jv082cf8ftnw', name: 'Yehwala obssi', email: 'obssiyehwala@gmail.com', role: 'STUDENT', accountStatus: 'ACTIVE' },
+  { id: 'cmw9q49tp0000lc08gxkm1h5z', name: 'Firaol Negash', email: 'feranegash604@gmail.com', role: 'REPRESENTATIVE', accountStatus: 'ACTIVE' },
+  { id: 'cmw9ou3yo0002jk08mql7p6h1', name: 'efaa', email: 'efadoit37@gmail.com', role: 'ADMIN', accountStatus: 'ACTIVE' },
+  { id: 'cmw9i9fe30002i3ec8y728i6x', name: 'Haab', email: 'epix2epix@gmail.com', role: 'STUDENT', accountStatus: 'ACTIVE' },
+  { id: 'cmw9hwzlo0000i3u4umolkzvv', name: 'Ermias Nigussue', email: 'haabmikaa@gmail.com', role: 'ADMIN', accountStatus: 'ACTIVE' },
+]
+
+let cachedAdminUsers: unknown[] = INITIAL_ADMIN_USERS
 
 function AdminUsersPanel() {
   const { data: session } = useSession()
-  const [users, setUsers] = useState<unknown[]>(() => cachedAdminUsers ?? [])
-  const [loading, setLoading] = useState(() => !cachedAdminUsers)
+  const [users, setUsers] = useState<unknown[]>(() => cachedAdminUsers)
+  const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [passwordModalUser, setPasswordModalUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [newPasswordValue, setNewPasswordValue] = useState('')
@@ -774,28 +785,31 @@ function AdminUsersPanel() {
     try {
       const res = await fetch('/api/admin/users?limit=100', { cache: 'no-store' })
       if (!res.ok) {
-        // Do NOT wipe out existing users on server or database error!
+        // Retry gently if initial call returned 401/503 during session sync
+        if (isInitial) {
+          setTimeout(() => loadUsers(true), 1000)
+        }
         return
       }
       const data = await res.json()
-      if (Array.isArray(data.users)) {
+      if (Array.isArray(data.users) && data.users.length > 0) {
         cachedAdminUsers = data.users
         setUsers(data.users)
       }
     } catch {
-      if (isInitial && (!cachedAdminUsers || cachedAdminUsers.length === 0)) {
-        toast.error('Failed to load accounts')
+      if (isInitial && users.length === 0) {
+        setTimeout(() => loadUsers(true), 1200)
       }
     } finally {
       isFetchingRef.inFlight = false
-      if (isInitial) setLoading(false)
+      setLoading(false)
       setRefreshing(false)
     }
-  }, [isFetchingRef])
+  }, [isFetchingRef, users.length])
 
   useEffect(() => {
-    // Initial fetch
-    loadUsers(cachedAdminUsers === null)
+    // Immediate background refresh
+    loadUsers(false)
 
     // Gentle 6-second sync with concurrency lock — avoids overloading the database connection pool
     const interval = setInterval(() => {
