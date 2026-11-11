@@ -38,18 +38,18 @@ export async function GET(req: NextRequest) {
     } catch {
       // Small pause and 1 retry for serverless DB reconnection
       await new Promise((r) => setTimeout(r, 200))
-      ;[users, total] = await Promise.all([
-        prisma.user.findMany({
-          select: {
-            id: true, name: true, email: true, role: true, accountStatus: true,
-            emailVerifiedAt: true, createdAt: true, updatedAt: true,
-          },
-          orderBy: { createdAt: 'desc' },
-          skip: (page - 1) * limit,
-          take: limit,
-        }),
-        prisma.user.count(),
-      ])
+        ;[users, total] = await Promise.all([
+          prisma.user.findMany({
+            select: {
+              id: true, name: true, email: true, role: true, accountStatus: true,
+              emailVerifiedAt: true, createdAt: true, updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            skip: (page - 1) * limit,
+            take: limit,
+          }),
+          prisma.user.count(),
+        ])
     }
 
     return NextResponse.json(
