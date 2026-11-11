@@ -747,38 +747,54 @@ export default function AdminDashboard() {
   )
 }
 
+let cachedAdminUsers: unknown[] | null = null
+
 function AdminUsersPanel() {
   const { data: session } = useSession()
-  const [users, setUsers] = useState<unknown[]>([])
-  const [loading, setLoading] = useState(true)
+  const [users, setUsers] = useState<unknown[]>(() => cachedAdminUsers ?? [])
+  const [loading, setLoading] = useState(() => !cachedAdminUsers)
   const [refreshing, setRefreshing] = useState(false)
   const [passwordModalUser, setPasswordModalUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [newPasswordValue, setNewPasswordValue] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null)
+  const isFetchingRef = useState({ inFlight: false })[0]
 
   const loadUsers = useCallback(async (isInitial = false) => {
+    // Prevent stacking requests if previous query is still pending
+    if (isFetchingRef.inFlight) return
+    isFetchingRef.inFlight = true
+
     try {
       const res = await fetch('/api/admin/users?limit=100', { cache: 'no-store' })
+      if (!res.ok) {
+        // Do NOT wipe out existing users on server or database error!
+        return
+      }
       const data = await res.json()
-      if (data.users) {
+      if (Array.isArray(data.users)) {
+        cachedAdminUsers = data.users
         setUsers(data.users)
       }
     } catch {
-      if (isInitial) toast.error('Failed to load accounts')
+      if (isInitial && (!cachedAdminUsers || cachedAdminUsers.length === 0)) {
+        toast.error('Failed to load accounts')
+      }
     } finally {
+      isFetchingRef.inFlight = false
       if (isInitial) setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [isFetchingRef])
 
   useEffect(() => {
-    loadUsers(true)
+    // Initial fetch
+    loadUsers(cachedAdminUsers === null)
 
-    // Instant real-time background sync every 3 seconds
+    // Gentle 6-second sync with concurrency lock — avoids overloading the database connection pool
     const interval = setInterval(() => {
       loadUsers(false)
-    }, 3000)
+    }, 6000)
 
     const handleFocus = () => loadUsers(false)
     const handleVisibility = () => {

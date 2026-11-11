@@ -28,7 +28,6 @@ export async function GET(req: NextRequest) {
           select: {
             id: true, name: true, email: true, role: true, accountStatus: true,
             emailVerifiedAt: true, createdAt: true, updatedAt: true,
-            _count: { select: { sessions: true, requests: true } },
           },
           orderBy: { createdAt: 'desc' },
           skip: (page - 1) * limit,
@@ -44,7 +43,6 @@ export async function GET(req: NextRequest) {
           select: {
             id: true, name: true, email: true, role: true, accountStatus: true,
             emailVerifiedAt: true, createdAt: true, updatedAt: true,
-            _count: { select: { sessions: true, requests: true } },
           },
           orderBy: { createdAt: 'desc' },
           skip: (page - 1) * limit,
@@ -61,7 +59,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('[GET /api/admin/users] Database query error:', err)
     return NextResponse.json(
-      { error: (err as Error).message, users: [], total: 0, page, limit },
+      { error: (err as Error).message, page, limit },
       { status: 503, headers: { 'Cache-Control': 'no-store' } }
     )
   }
