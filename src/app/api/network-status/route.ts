@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       clientIp,
       isVerifiedEthernet: verification.isVerifiedEthernet,
       verificationEnabled: enabledSetting?.value === 'true',
-      trustedPatterns: trustedIpsSetting?.value || '10.10.*, 192.168.*, 127.0.0.1, ::1, localhost',
+      trustedPatterns: trustedIpsSetting?.value || '10.240.72.1-10.240.72.225, 10.240.72.*, 196.189.233.*, 196.189.*.*, 102.213.68.*, 102.213.*.*, 10.10.*, 172.24.*, 192.168.*, 127.0.0.1, ::1, localhost',
     })
   } catch (err) {
     return NextResponse.json({
