@@ -7,13 +7,32 @@ import { ConnectionType } from '@prisma/client'
  * Extract real client IP from incoming NextRequest
  */
 export function getClientIp(req: NextRequest): string {
+  let ip = ''
   const forwarded = req.headers.get('x-forwarded-for')
   if (forwarded) {
-    return forwarded.split(',')[0].trim()
+    ip = forwarded.split(',')[0].trim()
+  } else if (req.headers.get('x-real-ip')) {
+    ip = req.headers.get('x-real-ip')!.trim()
+  } else if (req.headers.get('cf-connecting-ip')) {
+    ip = req.headers.get('cf-connecting-ip')!.trim()
+  } else if (req.headers.get('x-client-ip')) {
+    ip = req.headers.get('x-client-ip')!.trim()
+  } else {
+    // Next.js request IP fallback if available
+    ip = (req as any).ip ?? '127.0.0.1'
   }
-  const realIp = req.headers.get('x-real-ip')
-  if (realIp) return realIp.trim()
-  return '127.0.0.1'
+
+  // Normalize IPv6-mapped IPv4 (e.g., ::ffff:10.240.72.5 -> 10.240.72.5)
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.slice(7)
+  }
+
+  // Handle localhost IPv6 loopback
+  if (ip === '::1') {
+    return '127.0.0.1'
+  }
+
+  return ip
 }
 
 /**
@@ -36,12 +55,16 @@ function ipToInt(ip: string): number | null {
  * - Localhost / loopback: "127.0.0.1", "::1", "localhost"
  */
 export function isIpMatch(clientIp: string, pattern: string): boolean {
-  const p = pattern.trim()
+  let cleanIp = clientIp.trim()
+  if (cleanIp.startsWith('::ffff:')) cleanIp = cleanIp.slice(7)
+  let p = pattern.trim()
+  if (p.startsWith('::ffff:')) p = p.slice(7)
+
   if (!p) return false
-  if (p === '*' || p === clientIp) return true
+  if (p === '*' || p === cleanIp) return true
 
   // Localhost aliases
-  if ((clientIp === '::1' || clientIp === '127.0.0.1') && (p === '127.0.0.1' || p === '::1' || p === 'localhost')) {
+  if ((cleanIp === '::1' || cleanIp === '127.0.0.1') && (p === '127.0.0.1' || p === '::1' || p === 'localhost')) {
     return true
   }
 
@@ -51,7 +74,7 @@ export function isIpMatch(clientIp: string, pattern: string): boolean {
     const [startStr, endStr] = p.split(separator)
     const start = ipToInt(startStr.trim())
     const end = ipToInt(endStr.trim())
-    const client = ipToInt(clientIp)
+    const client = ipToInt(cleanIp)
     if (start !== null && end !== null && client !== null) {
       return client >= Math.min(start, end) && client <= Math.max(start, end)
     }
@@ -62,7 +85,7 @@ export function isIpMatch(clientIp: string, pattern: string): boolean {
     const [baseStr, maskStr] = p.split('/')
     const base = ipToInt(baseStr.trim())
     const mask = parseInt(maskStr.trim(), 10)
-    const client = ipToInt(clientIp)
+    const client = ipToInt(cleanIp)
     if (base !== null && client !== null && !isNaN(mask) && mask >= 0 && mask <= 32) {
       const maskBits = mask === 0 ? 0 : ((~0 << (32 - mask)) >>> 0)
       return (client & maskBits) === (base & maskBits)
@@ -72,10 +95,10 @@ export function isIpMatch(clientIp: string, pattern: string): boolean {
   // Wildcard prefix: "10.240.72.*"
   if (p.endsWith('*')) {
     const prefix = p.slice(0, -1)
-    return clientIp.startsWith(prefix)
+    return cleanIp.startsWith(prefix)
   }
 
-  return clientIp === p
+  return cleanIp === p
 }
 
 /**
