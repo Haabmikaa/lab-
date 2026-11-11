@@ -99,7 +99,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 422 })
 
   try {
-    const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } })
+    let existing = null
+    try {
+      existing = await prisma.user.findUnique({ where: { email: parsed.data.email } })
+    } catch {
+      await new Promise((r) => setTimeout(r, 200))
+      existing = await prisma.user.findUnique({ where: { email: parsed.data.email } })
+    }
+
     if (existing) return NextResponse.json({ error: 'Email already registered' }, { status: 409 })
 
     const passwordHash = parsed.data.password
@@ -110,17 +117,38 @@ export async function POST(req: NextRequest) {
     const emailVerifiedAt = parsed.data.password ? new Date() : null
     const accountStatus = parsed.data.password ? AccountStatus.ACTIVE : AccountStatus.PENDING_VERIFICATION
 
-    const user = await prisma.user.create({
-      data: {
-        email: parsed.data.email,
-        name: parsed.data.name,
-        role: parsed.data.role ?? Role.STUDENT,
-        passwordHash,
-        emailVerifiedAt,
-        accountStatus,
-      },
-      select: { id: true, name: true, email: true, role: true, accountStatus: true, createdAt: true },
-    })
+    let user
+    try {
+      user = await prisma.user.create({
+        data: {
+          email: parsed.data.email,
+          name: parsed.data.name,
+          role: parsed.data.role ?? Role.STUDENT,
+          passwordHash,
+          emailVerifiedAt,
+          accountStatus,
+        },
+        select: { id: true, name: true, email: true, role: true, accountStatus: true, createdAt: true },
+      })
+    } catch {
+      await new Promise((r) => setTimeout(r, 300))
+      user = await prisma.user.create({
+        data: {
+          email: parsed.data.email,
+          name: parsed.data.name,
+          role: parsed.data.role ?? Role.STUDENT,
+          passwordHash,
+          emailVerifiedAt,
+          accountStatus,
+        },
+        select: { id: true, name: true, email: true, role: true, accountStatus: true, createdAt: true },
+      })
+    }
+
+    // Immediately prepend to in-memory cached list so users tab reflects it instantly
+    if (user) {
+      lastKnownGoodUsers = [user, ...lastKnownGoodUsers.filter((u: any) => u.id !== user.id)]
+    }
 
     await auditLog({
       actorUserId: session!.user.id,
@@ -133,13 +161,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ user }, { status: 201 })
   } catch (err) {
     console.error('[POST /api/admin/users] Database error:', err)
-    const msg = (err as Error).message || ''
-    if (msg.includes('Authentication failed') || msg.includes('connect') || msg.includes('Can\'t reach database server')) {
-      return NextResponse.json({
-        error: 'Database connection failed. Please check your DATABASE_URL in .env.local and run `npm run db:push`.'
-      }, { status: 503 })
+    const rawMsg = (err as Error).message || ''
+    if (rawMsg.includes('Unique constraint')) {
+      return NextResponse.json({ error: 'A user with this email address already exists.' }, { status: 409 })
     }
-    return NextResponse.json({ error: 'Failed to create user. Ensure database is connected and migrated.' }, { status: 500 })
+    return NextResponse.json({
+      error: rawMsg || 'Failed to create user account. Please try again.'
+    }, { status: 500 })
   }
 }
 
