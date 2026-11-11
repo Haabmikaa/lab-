@@ -21,7 +21,9 @@ export default function PublicDashboard() {
       const res = await fetch('/api/tables', { cache: 'no-store' })
       if (res.ok) {
         const json: PublicDashboardData = await res.json()
-        setData(json)
+        if (json.tables && json.tables.length > 0) {
+          setData(json)
+        }
       }
     } catch {
       // Handled silently with cached/fallback data

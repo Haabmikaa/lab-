@@ -98,10 +98,18 @@ export default function StudentDashboard() {
       const [tablesJson, sessionJson, requestsJson, networkJson] = await Promise.all([
         tablesRes.json(), sessionRes.json(), requestsRes.json(), networkRes.json(),
       ])
-      setTableData(tablesJson)
-      setMySession(sessionJson.session ?? null)
-      setMyRequests(requestsJson.requests ?? [])
-      setNetworkStatus(networkJson)
+      if (tablesRes.ok && tablesJson.tables && tablesJson.tables.length > 0) {
+        setTableData(tablesJson)
+      }
+      if (sessionRes.ok) {
+        setMySession(sessionJson.session ?? null)
+      }
+      if (requestsRes.ok && Array.isArray(requestsJson.requests)) {
+        setMyRequests(requestsJson.requests)
+      }
+      if (networkRes.ok) {
+        setNetworkStatus(networkJson)
+      }
     } catch {
       if (isInitial) toast.error('Failed to load session details')
     } finally {

@@ -110,9 +110,15 @@ export default function AdminDashboard() {
       const [tablesJson, adminTablesJson, requestsJson] = await Promise.all([
         tablesRes.json(), adminTablesRes.json(), requestsRes.json(),
       ])
-      setTableData(tablesJson)
-      setAdminTables(adminTablesJson.tables ?? [])
-      setPendingRequests(requestsJson.requests ?? [])
+      if (tablesRes.ok && tablesJson.tables && tablesJson.tables.length > 0) {
+        setTableData(tablesJson)
+      }
+      if (adminTablesRes.ok && Array.isArray(adminTablesJson.tables) && adminTablesJson.tables.length > 0) {
+        setAdminTables(adminTablesJson.tables)
+      }
+      if (requestsRes.ok && Array.isArray(requestsJson.requests)) {
+        setPendingRequests(requestsJson.requests)
+      }
     } catch {
       // Handled silently
     } finally {
