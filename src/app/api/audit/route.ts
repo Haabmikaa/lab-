@@ -6,6 +6,9 @@ import { auditLogQuerySchema } from '@/lib/validations'
 
 export const dynamic = 'force-dynamic'
 
+let lastKnownGoodLogs: unknown[] = []
+let lastKnownGoodTotal = 0
+
 export async function GET(req: NextRequest) {
   const { error } = await requireAdmin()
   if (error) return error
@@ -32,41 +35,56 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        include: {
-          actor: { select: { id: true, name: true, email: true, role: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.auditLog.count({ where }),
-    ])
+    let logs, total
+    try {
+      ;[logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+          where,
+          include: {
+            actor: { select: { id: true, name: true, email: true, role: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.auditLog.count({ where }),
+      ])
+    } catch {
+      // Retry once on serverless connection queue
+      await new Promise((r) => setTimeout(r, 250))
+      ;[logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+          where,
+          include: {
+            actor: { select: { id: true, name: true, email: true, role: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.auditLog.count({ where }),
+      ])
+    }
+
+    if (logs && logs.length > 0) {
+      lastKnownGoodLogs = logs
+      lastKnownGoodTotal = total
+    }
 
     return NextResponse.json(
-      { logs, total, page, limit },
+      { logs: lastKnownGoodLogs, total: lastKnownGoodTotal || lastKnownGoodLogs.length, page, limit },
       { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
     )
   } catch (err) {
-    console.warn('[GET /api/audit] Database offline or unmigrated, returning empty audit list:', (err as Error).message)
+    console.warn('[GET /api/audit] Database offline or unmigrated, returning last known logs:', (err as Error).message)
     return NextResponse.json(
       {
-        logs: [
-          {
-            id: 'initial-setup-log',
-            action: 'SYSTEM_STARTUP',
-            entityType: 'System',
-            createdAt: new Date().toISOString(),
-            actor: { name: 'System', email: 'system@university.edu', role: 'ADMIN' },
-          },
-        ],
-        total: 1,
-        page: 1,
-        limit: 20,
+        logs: lastKnownGoodLogs,
+        total: lastKnownGoodTotal || lastKnownGoodLogs.length,
+        page,
+        limit,
       },
-      { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' } }
+      { headers: { 'Cache-Control': 'no-store' } }
     )
   }
 }

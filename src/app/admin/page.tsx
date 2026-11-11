@@ -351,8 +351,8 @@ export default function AdminDashboard() {
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab
-                  ? 'bg-[#6321FB] text-white shadow-md shadow-[#6321FB]/30'
-                  : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
+                ? 'bg-[#6321FB] text-white shadow-md shadow-[#6321FB]/30'
+                : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10'
                 }`}
             >
               {tab}
@@ -466,9 +466,9 @@ export default function AdminDashboard() {
                           </span>
                         )}
                         <span className={`text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold tracking-wider border ${table.status === 'AVAILABLE' ? 'bg-[#6BFFC5]/10 text-[#6BFFC5] border-[#6BFFC5]/30' :
-                            table.status === 'OCCUPIED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
-                              table.status === 'RESERVED' ? 'bg-[#6321FB]/20 text-[#c4b5fd] border-[#6321FB]/40' :
-                                'bg-zinc-800 text-zinc-400 border-zinc-700'
+                          table.status === 'OCCUPIED' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
+                            table.status === 'RESERVED' ? 'bg-[#6321FB]/20 text-[#c4b5fd] border-[#6321FB]/40' :
+                              'bg-zinc-800 text-zinc-400 border-zinc-700'
                           }`}>
                           {table.status}
                         </span>
@@ -518,8 +518,8 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => handleToggleReservedOccupancy(table.id, table.status, table.tableCode)}
                             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-mono font-bold border transition-all ${table.status === 'OCCUPIED'
-                                ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
-                                : 'bg-[#6321FB]/30 border-[#6321FB]/50 text-white hover:bg-[#6321FB]/50'
+                              ? 'bg-rose-500/20 border-rose-500/40 text-rose-300 hover:bg-rose-500/30'
+                              : 'bg-[#6321FB]/30 border-[#6321FB]/50 text-white hover:bg-[#6321FB]/50'
                               }`}
                           >
                             {table.status === 'OCCUPIED' ? (
@@ -552,8 +552,8 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => !table.hasEthernet && handleToggleEthernet(table.id, false, table.tableCode)}
                             className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold font-mono transition-all ${table.hasEthernet
-                                ? 'bg-[#6BFFC5] text-[#101010] shadow-md shadow-[#6BFFC5]/20 font-bold'
-                                : 'text-zinc-400 hover:text-white hover:bg-white/5 cursor-pointer'
+                              ? 'bg-[#6BFFC5] text-[#101010] shadow-md shadow-[#6BFFC5]/20 font-bold'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/5 cursor-pointer'
                               }`}
                           >
                             <Cable className="w-3.5 h-3.5" />
@@ -564,8 +564,8 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => table.hasEthernet && handleToggleEthernet(table.id, true, table.tableCode)}
                             className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-semibold font-mono transition-all ${!table.hasEthernet
-                                ? 'bg-amber-400 text-[#101010] shadow-md shadow-amber-400/20 font-bold'
-                                : 'text-zinc-400 hover:text-white hover:bg-white/5 cursor-pointer'
+                              ? 'bg-amber-400 text-[#101010] shadow-md shadow-amber-400/20 font-bold'
+                              : 'text-zinc-400 hover:text-white hover:bg-white/5 cursor-pointer'
                               }`}
                           >
                             <Wifi className="w-3.5 h-3.5" />
@@ -968,16 +968,14 @@ function AdminUsersPanel() {
                     </td>
                     <td className="py-3 px-3 text-zinc-400 font-mono">{u.email}</td>
                     <td className="py-3 px-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                        u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
-                      }`}>{u.role}</span>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${u.role === 'ADMIN' ? 'bg-[#6321FB] text-white' : 'bg-[#6321FB]/20 text-[#c4b5fd]'
+                        }`}>{u.role}</span>
                     </td>
                     <td className="py-3 px-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
-                        u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
-                        u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
-                        'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      }`}>{u.accountStatus}</span>
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${u.accountStatus === 'ACTIVE' ? 'bg-[#6BFFC5]/20 text-[#6BFFC5] border border-[#6BFFC5]/40' :
+                          u.accountStatus === 'DISABLED' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
+                            'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                        }`}>{u.accountStatus}</span>
                     </td>
                     <td className="py-3 px-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -995,11 +993,10 @@ function AdminUsersPanel() {
                         {!isSelf && u.role !== 'ADMIN' && (
                           <button
                             onClick={() => handleToggleStatus(u.id, u.accountStatus, u.name)}
-                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${
-                              u.accountStatus === 'ACTIVE'
+                            className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase font-bold transition-all ${u.accountStatus === 'ACTIVE'
                                 ? 'border border-amber-500/40 text-amber-300 hover:bg-amber-500 hover:text-black'
                                 : 'border border-[#6BFFC5]/40 text-[#6BFFC5] hover:bg-[#6BFFC5] hover:text-[#101010]'
-                            }`}
+                              }`}
                           >
                             {u.accountStatus === 'ACTIVE' ? 'Disable' : 'Enable'}
                           </button>
@@ -1083,32 +1080,49 @@ function AdminUsersPanel() {
   )
 }
 
+let cachedAuditLogs: unknown[] = []
+
 function AdminAuditPanel() {
-  const [logs, setLogs] = useState<unknown[]>([])
-  const [loading, setLoading] = useState(true)
+  const [logs, setLogs] = useState<unknown[]>(() => cachedAuditLogs)
+  const [loading, setLoading] = useState(() => cachedAuditLogs.length === 0)
   const [refreshing, setRefreshing] = useState(false)
+  const isFetchingRef = useState({ inFlight: false })[0]
 
   const loadAudit = useCallback(async (isInitial = false) => {
+    if (isFetchingRef.inFlight) return
+    isFetchingRef.inFlight = true
+
     try {
       const res = await fetch('/api/audit?limit=50', { cache: 'no-store' })
+      if (!res.ok) {
+        if (isInitial && cachedAuditLogs.length === 0) {
+          setTimeout(() => loadAudit(true), 1200)
+        }
+        return
+      }
       const data = await res.json()
-      if (data.logs) {
+      if (Array.isArray(data.logs) && data.logs.length > 0) {
+        cachedAuditLogs = data.logs
         setLogs(data.logs)
       }
     } catch {
-      if (isInitial) toast.error('Failed to load audit records')
+      if (isInitial && cachedAuditLogs.length === 0) {
+        setTimeout(() => loadAudit(true), 1500)
+      }
     } finally {
-      if (isInitial) setLoading(false)
+      isFetchingRef.inFlight = false
+      setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [isFetchingRef])
 
   useEffect(() => {
-    loadAudit(true)
+    loadAudit(cachedAuditLogs.length === 0)
 
+    // Gentle 8-second background polling with in-flight lock
     const interval = setInterval(() => {
       loadAudit(false)
-    }, 3000)
+    }, 8000)
 
     const handleFocus = () => loadAudit(false)
     const handleVisibility = () => {
@@ -1179,18 +1193,26 @@ type SettingItem = {
   updatedAt: string
 }
 
+let cachedAdminSettings: SettingItem[] = []
+
 function AdminSettingsPanel() {
-  const [settings, setSettings] = useState<SettingItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState<SettingItem[]>(() => cachedAdminSettings)
+  const [loading, setLoading] = useState(() => cachedAdminSettings.length === 0)
   const [refreshing, setRefreshing] = useState(false)
   const [savingKey, setSavingKey] = useState<string | null>(null)
-  const [editValues, setEditValues] = useState<Record<string, string>>({})
+  const [editValues, setEditValues] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {}
+    cachedAdminSettings.forEach((s) => { init[s.key] = s.value })
+    return init
+  })
 
   const fetchSettings = useCallback(async (isInitial = false) => {
     try {
       const res = await fetch('/api/admin/settings', { cache: 'no-store' })
+      if (!res.ok) return
       const data = await res.json()
-      if (data.settings) {
+      if (Array.isArray(data.settings) && data.settings.length > 0) {
+        cachedAdminSettings = data.settings
         setSettings(data.settings)
         setEditValues((prev) => {
           const updated = { ...prev }
@@ -1203,15 +1225,15 @@ function AdminSettingsPanel() {
         })
       }
     } catch {
-      if (isInitial) toast.error('Failed to load system settings')
+      if (isInitial && cachedAdminSettings.length === 0) toast.error('Failed to load system settings')
     } finally {
-      if (isInitial) setLoading(false)
+      setLoading(false)
       setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchSettings(true)
+    fetchSettings(cachedAdminSettings.length === 0)
   }, [fetchSettings])
 
   async function handleSave(key: string) {
